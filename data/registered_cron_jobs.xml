@@ -1,0 +1,15 @@
+<odoo>
+  <data>
+    <!-- Cron Jobs Templates -->
+    <record model="maya_core.cron_register" id="maya_students.cron_check_attendance_classroom">
+      <field name="name">Comprueba conexión al aula</field>
+      <field name="key">CAAL</field>
+      <field name="context">FPC</field>
+      <field name="model">cron_check_attendance_classroom</field>
+      <field name="code">cron_check_attendance_classroom</field>
+      <field name="numbercall">1</field>
+      <field name="nextcall_day">school_year.date_init</field>
+      <field name="nextcall_hour">23:00:00</field>
+    </record>
+  </data>
+</odoo>

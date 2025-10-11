@@ -33,7 +33,8 @@
         'security/ir.model.access.csv',
         # vistas
         'views/views.xml',
-        #'views/templates.xml',
+        # datos de modelos
+        'data/registered_cron_jobs.xml',
     ],
     # only loaded in demonstration mode
     'demo': [
