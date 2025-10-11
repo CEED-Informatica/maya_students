@@ -1,2 +1,3 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
 access_maya_students_cancellation,access_maya_students_cancellation,maya_students.model_maya_students_cancellation,base.group_user,1,1,1,1
+access_maya_students_cron_check_attendance_classroom,access_maya_students_cron_check_attendance_classroom,maya_students.model_maya_students_cron_check_attendance_classroom,maya_core.group_ROOT,1,1,1,1
