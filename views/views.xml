@@ -1,0 +1,60 @@
+<odoo>
+  <data>
+
+    <record model="ir.ui.view" id="maya_students.cancellation_tree">
+      <field name="name">Lista de anulaciones</field>
+      <field name="model">maya_students.cancellation</field>
+      <field name="arch" type="xml">
+        <tree limit="20">
+           <field name="situation" />
+        </tree>
+      </field>
+    </record>
+
+   <!-- actions opening views on models -->
+   <record model="ir.actions.act_window" id="maya_students.action_cancellation_ordinary">
+      <field name="name">Anulaciones ordinarias</field>
+      <field name="res_model">maya_students.cancellation</field>
+      <field name="view_mode">tree</field> 
+      <field name="domain">[('cancellation_type', '=', 'ORD')]</field>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">Todavía no hay ninguna anulación de matrícula pendiente</p>
+      </field>
+    </record>
+
+    <record model="ir.actions.act_window" id="maya_students.action_cancellation_exofficio">
+      <field name="name">Anulaciones de oficio</field>
+      <field name="res_model">maya_students.cancellation</field>
+      <field name="view_mode">tree</field>
+      <field name="domain">[('cancellation_type', '=', 'OFC')]</field>
+      <field name="help" type="html">
+        <p class="o_view_nocontent_smiling_face">Todavía no hay ninguna baja de oficio pendiente</p>
+      </field>
+    </record>
+
+    <record model="ir.actions.act_window" id="maya_students.action_config_settings">
+      <field name="name">Configuración</field>
+      <field name="res_model">res.config.settings</field>
+      <field name="view_mode">form</field>
+      <field name="target">inline</field> <!-- new window: emergente, curret: en al misma, inline: sin botones editar/crear-->
+      <field name="context">{'module': 'maya_students'}</field>
+    </record>
+
+    <!-- Top menu item -->
+    <menuitem name="Maya | Estudiantes" id="maya_students.menu_root" sequence="4"/>
+
+    <!-- menu categories -->
+    <menuitem name="Anulaciones" id="maya_students.menu_cancellation" parent="maya_students.menu_root"/>
+    <menuitem name="Configuración" id="maya_students.menu_configuration" parent="maya_students.menu_root"/>
+    
+    <!-- menú convalidaciones -->
+    <menuitem name="Ordinarias" id="maya_students.menu_cancellation_ordinary" parent="maya_students.menu_cancellation"
+              action="maya_students.action_cancellation_ordinary"/>
+    <menuitem name="Oficio" id="maya_students.menu_cancellation_exofficio" parent="maya_students.menu_cancellation"
+              action="maya_students.action_cancellation_exofficio"/>
+  
+    <!-- Menu Configuración -->
+    <menuitem name="General" id="maya_students.menu_settings" parent="maya_students.menu_configuration"
+              action="maya_students.action_config_settings"/>
+  </data>
+</odoo>
