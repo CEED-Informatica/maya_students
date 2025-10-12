@@ -31,3 +31,22 @@ class Cancellation(models.Model):
   
   # Hasta cuando está justificada su ausencia
   justification_end = fields.Boolean(default = False)
+
+   # Relación 1:1 con subject_student_rel
+  subject_student_rel_id = fields.Many2one(
+      'maya_core.subject_student_rel',
+      required=True,
+      ondelete='cascade',  # Si se borra el subject_student_rel, se borra esta anulacioón
+  )
+
+  student_name = fields.Char(string = 'Alumno', related = 'subject_student_rel_id.student_id.student_info')
+  subject_name = fields.Char(string = 'Módulo', related = 'subject_student_rel_id.subject_id.name')
+  subject_course = fields.Char(string = 'Ciclo', related = 'subject_student_rel_id.course_id.abbr')
+  
+
+  _sql_constraints = [
+    (
+        'unique_subject_student_rel_id',
+        'unique(subject_student_rel_id)',
+        'Cada relación Subject-Student sólo puede tener una anulación de matrícula.'
+    ),]

@@ -6,7 +6,10 @@
       <field name="model">maya_students.cancellation</field>
       <field name="arch" type="xml">
         <tree limit="20">
-           <field name="situation" />
+          <field name="student_name" />
+          <field name="subject_name" />
+          <field name="subject_course" />
+          <field name="situation" />
         </tree>
       </field>
     </record>

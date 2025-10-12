@@ -84,7 +84,15 @@ class CronCheckAttendanceClassroom(models.TransientModel):
         # los matriculamos en Maya si no lo están
         a_user =  CronJobEnrolUsers.enrol_student(self, user, classroom[1], course_id) 
 
+        # Lo añado en lista de cancelaciones de oficio
+        subject_student = self.env['maya_core.subject_student_rel']\
+          .search([('subject_id', '=', classroom[1]),('student_id', '=', a_user.id),('course_id', '=', course_id)])
         
+        cancellation = self.env['maya_students.cancellation'].create([
+            { 'subject_student_rel_id': subject_student[0].id,
+              'cancellation_type': 'OFC',
+              'situation': '1' }])
+
 
         
               
