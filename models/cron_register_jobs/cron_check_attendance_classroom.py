@@ -11,6 +11,9 @@ from ....maya_core.support.maya_moodleteacher.maya_moodle_connection import Maya
 from ....maya_core.support.maya_moodleteacher.maya_moodle_user import MayaMoodleUsers
 
 from ....maya_core.models.cron_register_jobs.cron_job_enrol_users import CronJobEnrolUsers
+from ....maya_core.models.student import Student
+
+from ....maya_core.support.helper import read_itaca_csv
 
 _logger = logging.getLogger(__name__)
 
@@ -61,6 +64,11 @@ class CronCheckAttendanceClassroom(models.TransientModel):
     else:
       deadline = current_datetime - timedelta(days=days)
 
+    #TODO parametrizar estos datos en configuraciones
+    archivo_csv = '/mnt/odoo-repo/itaca/temp.csv'
+
+    df, data_stack= read_itaca_csv(archivo_csv)
+
     for classroom in check_classrooms_id:
       print('\033[0;34m[INFO]\033[0m Obteniendo usuarios del aula ->', classroom[1])  
       
@@ -82,11 +90,14 @@ class CronCheckAttendanceClassroom(models.TransientModel):
     
       for user in risk_users:
         # los matriculamos en Maya si no lo están
-        a_user =  CronJobEnrolUsers.enrol_student(self, user, classroom[1], course_id) 
+        maya_user =  CronJobEnrolUsers.enrol_student(self, user, classroom[1], course_id) 
+
+        # actualizo sus datos desde Itaca
+        _, record_errors = Student.update_student_data_from_itaca(maya_user, df, data_stack)
 
         # Lo añado en lista de cancelaciones de oficio
         subject_student = self.env['maya_core.subject_student_rel']\
-          .search([('subject_id', '=', classroom[1]),('student_id', '=', a_user.id),('course_id', '=', course_id)])
+          .search([('subject_id', '=', classroom[1]),('student_id', '=', maya_user.id),('course_id', '=', course_id)])
         
         cancellation = self.env['maya_students.cancellation'].create([
             { 'subject_student_rel_id': subject_student[0].id,
