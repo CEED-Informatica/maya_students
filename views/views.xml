@@ -1,6 +1,20 @@
 <odoo>
   <data>
 
+    <!-- filtros para las anulaciones  -->
+    <record model="ir.ui.view" id="maya_students.cancellation_tree_search">
+      <field name="name">Agrupacion para tareas</field>
+      <field name="model">maya_students.cancellation</field>
+      <field name="arch" type="xml">
+        <search>
+          <group expand='0' string='Agrupar'>
+            <filter name="group_by_course" string="Por ciclo" context="{'group_by': 'subject_course'}"/>
+            <filter name="group_by_subject" string="Por módulo" context="{'group_by': 'subject_name'}"/>
+          </group>
+        </search>    
+      </field>
+    </record>
+
     <record model="ir.ui.view" id="maya_students.cancellation_tree">
       <field name="name">Lista de anulaciones</field>
       <field name="model">maya_students.cancellation</field>
@@ -30,6 +44,11 @@
       <field name="res_model">maya_students.cancellation</field>
       <field name="view_mode">tree</field>
       <field name="domain">[('cancellation_type', '=', 'OFC')]</field>
+      <field name="context">{
+        'search_default_group_by_course': 1,
+        'search_default_group_by_subject': 1,
+      }
+      </field>
       <field name="help" type="html">
         <p class="o_view_nocontent_smiling_face">Todavía no hay ninguna baja de oficio pendiente</p>
       </field>
