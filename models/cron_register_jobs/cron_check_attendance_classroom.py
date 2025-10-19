@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime, timedelta
-from odoo import models, api
+from odoo import models, api, fields
 import logging
 
 from ....maya_core.support.maya_logger.exceptions import MayaException
@@ -38,7 +38,7 @@ class CronCheckAttendanceClassroom(models.TransientModel):
 
     try:
       conn = MayaMoodleConnection( 
-        user = self.env['ir.config_parameter'].get_param('maya_core.moodle_user'), 
+        user = self.env['ir.config_parameter'].get_param('maya_core.moodle_user_admin'), 
         moodle_host = self.env['ir.config_parameter'].get_param('maya_core.moodle_url')) 
     except Exception as e:
       raise Exception('No es posible realizar la conexión con Moodle' + str(e))
@@ -80,17 +80,17 @@ class CronCheckAttendanceClassroom(models.TransientModel):
         lastcourseaccess = getattr(user, "lastcourseaccess", None)
 
         if not lastcourseaccess or lastcourseaccess == 0:
-          access_datetime =  datetime.min
+          access_datetime =  datetime(2000, 1, 1, 0, 0) # con datetime.min, el widget no lo mostraba correctamente
         else:
           access_datetime = datetime.fromtimestamp(int(lastcourseaccess))
         
         if access_datetime < deadline:
-          risk_users.append(user)
+          risk_users.append([user, access_datetime])
 
     
       for user in risk_users:
         # los matriculamos en Maya si no lo están
-        maya_user =  CronJobEnrolUsers.enrol_student(self, user, classroom[1], course_id) 
+        maya_user =  CronJobEnrolUsers.enrol_student(self, user[0], classroom[1], course_id) 
 
         # actualizo sus datos desde Itaca
         _, record_errors = Student.update_student_data_from_itaca(maya_user, df, data_stack)
@@ -99,10 +99,23 @@ class CronCheckAttendanceClassroom(models.TransientModel):
         subject_student = self.env['maya_core.subject_student_rel']\
           .search([('subject_id', '=', classroom[1]),('student_id', '=', maya_user.id),('course_id', '=', course_id)])
         
-        cancellation = self.env['maya_students.cancellation'].create([
+        existing_cancellation = self.env['maya_students.cancellation'].search([
+          ('subject_student_rel_id', '=', subject_student[0].id)
+        ], limit=1)
+
+        if existing_cancellation:   # YA EXISTE: actualizo las fechas
+          existing_cancellation.write(
+            { 'query_date': fields.Datetime.now(),
+              'lastaccess_date': user[1] })
+        else:
+          cancellation = self.env['maya_students.cancellation'].create([
             { 'subject_student_rel_id': subject_student[0].id,
               'cancellation_type': 'OFC',
+              'query_date': fields.Datetime.now(),
+              'lastaccess_date': user[1],
               'situation': '1' }])
+          
+        self.env.cr.commit()  ## fuerzo el commit a la base de datos por cada item del bucle
 
 
         
