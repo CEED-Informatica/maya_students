@@ -34,6 +34,11 @@ class Cancellation(models.Model):
 
   lastaccess_date = fields.Datetime(string = 'Último acceso ', 
                                 help = 'Día y hora del último acceso al curso')
+  
+  lastaccess_date_text = fields.Char(
+    string="Última Conexión",
+    compute='_compute_lastaccess_date_text'
+  )
 
   # Hasta cuando está justificada su ausencia
   justification_end_date = fields.Date(string = 'Justificado hasta', 
@@ -85,6 +90,35 @@ class Cancellation(models.Model):
       else:
         record.related_cancellations_ids = False
 
+  @api.depends('lastaccess_date', 'query_date')
+  def _compute_lastaccess_date_text(self):
+    """
+    Calcula el texto de la última conexión.
+    """
+    # fecha que consideramos como "Nunca"
+    never_date = date(2000, 1, 1)
+
+    for record in self:
+      record.lastaccess_date_text = ""
+
+      if not record.lastaccess_date:
+        continue
+
+      # Si la fecha es 1/1/2000
+      if record.lastaccess_date.date() == never_date:
+        record.lastaccess_date_text = "Nunca"
+      else:
+        fecha_str = record.lastaccess_date.strftime('%d/%m/%Y %H:%M')     
+        n_dias_str = "N/D" # Valor por si 'query_date' no estuviera definida
+
+        # Calculamos los días SÓLO si tenemos ambas fechas
+        if record.query_date:
+          # UsO .date() en ambas para calcular días completos
+          delta = record.query_date.date() - record.lastaccess_date.date()
+          n_dias = delta.days
+          n_dias_str = str(n_dias)
+
+        record.lastaccess_date_text = f"{fecha_str} ({n_dias_str} dias desde la última consulta)"
 
   def clear_justification_date(self):
     """
