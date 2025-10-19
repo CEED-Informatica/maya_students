@@ -128,9 +128,17 @@ class Cancellation(models.Model):
 
   def set_justification_to_june(self):
     """
-    Asigna la fecha de la justificación a fonal de curso
+    Asigna la fecha de la justificación a final de curso
     """
-    pass
+    today = fields.Date.today()
+    current_year = today.year
+
+    if today <= date(current_year, 8, 31):
+      # 30 de Junio de ESTE año
+      self.justification_end_date = date(current_year, 6, 30)
+    else: # después del 31 de agosto, el 3o de junio del año que viene
+      self.justification_end_date = date(current_year + 1, 6, 30)
+
 
   def send_notification_mail(self):
     """
