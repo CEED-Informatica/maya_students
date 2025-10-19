@@ -47,11 +47,11 @@
               <field name="subject_name" /> 
               <field name="subject_course" />
               <field name="situation" />
-                <button name="action_clear_justification_date"
-                                type="object"
-                                string="Forzar envio mail"
-                                icon="fa-envelope"
-                                class="btn-secondary text-nowrap"/>
+              <button name="send_notification_mail"
+                      type="object"
+                      string="Forzar envio mail"
+                      icon="fa-envelope"
+                      class="btn-secondary text-nowrap"/>
             </group>
           </group>
           <separator string="Información" style="padding-bottom:15px"/>
@@ -70,19 +70,20 @@
                   <field name="justification_end_date" />
                 </group>
                 <group>
-
-                    <button name="action_clear_justification_date"
-                                type="object"
-                                string="Borrar justificación"
-                                icon="fa-trash"
-                                class="btn-secondary text-nowrap"
-                                attrs="{'invisible': [('justification_end_date','=',False)]}"/>
-                    <button name="action_set_justification_to_june"
+                  <div class="d-flex gap-4">
+                    <button name="set_justification_to_june"
+                                    type="object"
+                                    icon="fa-calendar-check-o"
+                                    string="Justificar hasta final de curso"
+                                    class="btn-secondary text-nowrap"/>
+                    <button name="clear_justification_date"
                                   type="object"
-                                  icon="fa-calendar-check-o text-nowrap"
-                                  string="Justificar hasta final de curso"
-                                  class="btn-secondary"/>
-
+                                  string="Borrar justificación"
+                                  icon="fa-trash"
+                                  class="btn-secondary text-nowrap"
+                                  style="width: 100%"
+                                  invisible="justification_end_date==False"/>
+                  </div>
                 </group>
               </group>
               <group>
