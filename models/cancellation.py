@@ -124,7 +124,7 @@ class Cancellation(models.Model):
     """
     Quita la fecha de la justificación
     """
-    pass
+    self.justification_end_date = False
 
   def set_justification_to_june(self):
     """
