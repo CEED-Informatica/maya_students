@@ -46,7 +46,12 @@
             <group>
               <field name="subject_name" /> 
               <field name="subject_course" />
-              <field name="situation" />
+              <field name="situation" widget="badge"
+                    decoration-warning="situation in ['3', '4']"
+                    decoration-danger="situation in ['6', '7']"
+                    decoration-success="situation == '5'"
+                    decoration-primary="situation in ['1', '7']"
+                    />
               <button name="send_notification_mail"
                       type="object"
                       string="Forzar envio mail"
@@ -99,6 +104,8 @@
                   <field name="justification_end_date"/>
                 </tree>
               </field>
+            </page>
+            <page string='Notificaciones'>
             </page>
           </notebook>
         </form>
