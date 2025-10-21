@@ -35,6 +35,7 @@
         'views/views.xml',
         # datos de modelos
         'data/registered_cron_jobs.xml',
+        'data/mail_templates/mail_risk1.xml',
     ],
     # only loaded in demonstration mode
     'demo': [

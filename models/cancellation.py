@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 from odoo import api, models, fields
+from odoo.exceptions import UserError
+
 from datetime import date
 
 class Cancellation(models.Model):
@@ -140,8 +142,51 @@ class Cancellation(models.Model):
       self.justification_end_date = date(current_year + 1, 6, 30)
 
 
+  def _get_teachers_reply_to_emails(self):
+    """
+    Busca todos los profesores asociados al módulo y ciclo
+    de esta anulación y devuelve un string con sus emails 
+    separados por coma.
+    """
+    self.ensure_one()
+
+    teacher_rel = self.env['maya_core.subject_employee_rel']
+        
+    teacher_rels = teacher_rel.search([
+        ('subject_id', '=', self.subject_student_rel_id.subject_id.id),
+        ('course_id', '=', self.subject_student_rel_id.course_id.id)
+    ])
+
+    # De las relaciones encontradas, extraigo los profesores y de ellos los emails
+    email_list = teacher_rels.mapped('employee_id').mapped('work_email') 
+
+    # Filtro emails vacíos y los uno con comas
+    valid_emails = [email for email in email_list if email]
+    
+    return ','.join(valid_emails)
+
   def send_notification_mail(self):
     """
     Fuerza el envio de un mail de notificación al alumno
     """
-    pass
+    self.ensure_one()
+
+    # compruebo que hay un email al menos
+    if not self.student_email and not self.student_email_support and not self.student_email_corp:
+      raise UserError(
+          f"¡Acción no permitida! \n\n"
+          f"El estudiante {self.student_name} no tiene ningún email configurado."
+      )
+
+
+    # Busco el servidor de correo del centro
+    mail_alias = self.env['ir.config_parameter'].get_param('maya_core.alias_mail_center')
+    mail_server = self.env['ir.mail_server'].search([('name', '=', mail_alias)], limit=1)
+    if not mail_server:
+        raise UserError(f"No se encontró el servidor de correo o no ha sido configurado {mail_alias}.")
+    
+    template = self.env.ref('maya_students.email_template_cancellation_risk1')
+
+    template.mail_server_id = mail_server.id
+    template.send_mail(self.id, force_send=True)
+

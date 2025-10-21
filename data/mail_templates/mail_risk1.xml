@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data noupdate="1">
+    <record id="email_template_cancellation_risk1" model="mail.template">
+      <field name="name">Plantilla mail a estudiantes en riesgo 1 de baja de oficio</field>
+      <field name="model_id" ref="model_maya_students_cancellation"/>
+      <field name="subject">[CEEDCV] URGENTE. Anulación de matrícula de oficio por falta de asistencia</field>
+        <field name="email_from">CEED Notificaciones</field>
+        <field name="email_to">${object.student_email_corp or ''}</field>
+        <field name="email_cc">
+            ${','.join([email for email in (object.student_email, object.student_email_support) if email])}
+        </field>
+        <field name="reply_to">
+          ${object._get_teachers_reply_to_emails()}
+        </field>
+        <field name="auto_delete" eval="True"/>
+        <field name="body_html"><![CDATA[
+<div style="margin: 0px; padding: 0px;">
+<p style="margin: 0px; padding: 0px; font-size: 13px;">
+    Estimado/a estudiante, 
+    <br/><br/>
+    ${object.student_name}<br/>
+    ${object.student_nia}<br/>
+    ${object.subject_course}<br/>
+    De acuerdo con la RESOLUCIÓN de 17 de julio de 2025, de la Secretaría Autonómica de Educación, 
+    por la que se dictan instrucciones sobre ordenación académica y de organización de los centros 
+    que impartan los grados D y E de Formación Profesional durante el curso 2025-2026 enç
+    la Comunidad Valenciana, le informamos que se ha detectado una inactividad en su participación
+    en el curso durante los últimos 8 días lectivos. 
+    <br/>
+    En cumplimiento de lo dispuesto en las <strong>Instrucciones de Inicio de Curso 2025-2026</strong>, 
+    se requiere que acceda al aula virtual del módulo XXXXXX (enlace del aula) para continuar con su formación. 
+    En caso de no registrar actividad en los próximos 2 días lectivos, procederemos a iniciar el proceso de baja de oficio, según la normativa vigente. 
+    <br/>
+    <br/>
+    Atentamente, 
+    <br/>
+</p>
+</div>
+        ]]></field>
+    </record>
+
+  </data>
+</odoo>
