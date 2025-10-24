@@ -65,10 +65,18 @@ class CronCheckAttendanceClassroom(models.TransientModel):
       deadline = current_datetime - timedelta(days=days)
 
     #TODO parametrizar estos datos en configuraciones
-    itaca_filename = self.env['ir.config_parameter'].get_param('maya_core.itaca_users_data'),
+    itaca_filename = self.env['ir.config_parameter'].get_param('maya_core.itaca_students_data')
+    if not itaca_filename:
+      print(f'\033[0;31m[ERROR]\033[0m No se ha definido el nombre del fichero de datos de itaca')
+      return
+
     csv_file = '/mnt/odoo-repo/itaca/' + itaca_filename
 
-    df, data_stack= read_itaca_csv(csv_file)
+    try:
+      df, data_stack = read_itaca_csv(csv_file)
+    except Exception as e:
+      print(f"\033[0;31m[ERROR]\033[0m Error procesando el fichero csv: {str(e)}")
+      return
 
     for classroom in check_classrooms_id:
       try:
