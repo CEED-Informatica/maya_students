@@ -140,7 +140,8 @@ class CronCheckAttendanceClassroom(models.TransientModel):
           if existing_cancellation:   # YA EXISTE: actualizo las fechas
             existing_cancellation.write(
               { 'query_date': fields.Datetime.now(),
-                'lastaccess_date': user[1] })
+                'lastaccess_date': user[1],
+                'classroom_moodle_id': classroom[0] })
             cancellation = existing_cancellation
           else:
             cancellation = self.env['maya_students.cancellation'].create([
@@ -148,7 +149,8 @@ class CronCheckAttendanceClassroom(models.TransientModel):
                 'cancellation_type': 'OFC',
                 'query_date': fields.Datetime.now(),
                 'lastaccess_date': user[1],
-                'situation': '1' }])
+                'situation': '1',
+                'classroom_moodle_id': classroom[0] }])
             
           # si es nueva o sigue en riesgo lo añado al set
           processed_cancellation_ids.add(cancellation.id)

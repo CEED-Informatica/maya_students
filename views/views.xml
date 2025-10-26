@@ -52,7 +52,7 @@
                     decoration-success="situation == '5'"
                     decoration-primary="situation in ['1', '7']"
                     />
-              <button name="send_notification_mail"
+              <button name="send_notification_mail_subject"
                       type="object"
                       string="Forzar envio mail"
                       icon="fa-envelope"
@@ -63,9 +63,11 @@
           <group col="2">
             <group>
               <field name="lastaccess_date_text" readonly="1"/> 
+              <field name="classroom_moodle_id" readonly="1"/> 
             </group>
             <group>
               <field name="query_date" readonly="1"/> 
+              <field name="classroom_link" widget="url" readonly="1"/>
             </group>
           </group>
           <notebook>

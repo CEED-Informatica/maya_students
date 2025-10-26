@@ -69,6 +69,9 @@ class Cancellation(models.Model):
     string='Otras anulaciones del alumno' 
   )  
 
+  classroom_moodle_id = fields.Integer(string = 'Id aula Moodle')
+  classroom_link = fields.Char(string = 'Enlace al aula', compute = '_compute_link_classroom')
+
   _sql_constraints = [(
     'unique_subject_student_rel_id',
     'unique(subject_student_rel_id)',
@@ -122,6 +125,19 @@ class Cancellation(models.Model):
 
         record.lastaccess_date_text = f"{fecha_str} ({n_dias_str} dias desde la última consulta)"
 
+  @api.depends('classroom_moodle_id')
+  def _compute_link_classroom(self):
+    """
+    Calcula la URL del aula
+    """
+    moodle_url = self.env['ir.config_parameter'].get_param('maya_core.moodle_url').rstrip('/') + '/'
+    for record in self:
+      if record.classroom_moodle_id:
+        record.classroom_link = moodle_url + 'course/view.php?id=' + str(record.classroom_moodle_id)
+      else:
+        record.classroom_link = ''
+
+  
   def clear_justification_date(self):
     """
     Quita la fecha de la justificación
@@ -164,8 +180,18 @@ class Cancellation(models.Model):
     valid_emails = [email for email in email_list if email_normalize(email)]
     
     return ','.join(valid_emails)
+  
+  def send_notification_mail_subject(self):
+    """
+    Fuerza el envio de un mail de notificación al alumno por una anulación
+    """
+    self.ensure_one()
+    self.send_notification_mail()
 
-  def send_notification_mail(self):
+    # para incluir a todos los módulos
+    #record.with_context(include_all_modules=True).send_notification_mail()
+
+  def send_notification_mail(self, include_all_subjects=False):
     """
     Fuerza el envio de un mail de notificación al alumno
     """
@@ -206,6 +232,11 @@ class Cancellation(models.Model):
     
     template = self.env.ref('maya_students.email_template_cancellation_risk1')
 
+    render_context = {
+        'include_all_subjects': include_all_subjects
+    }
+
     template.mail_server_id = mail_server.id
-    template.send_mail(self.id, force_send=True, email_values=email_values)
+    template.send_mail(self.id, force_send=True, 
+                       email_values=email_values)
 
