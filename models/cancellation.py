@@ -2,8 +2,13 @@
 
 from odoo import api, models, fields
 from odoo.exceptions import UserError
+import smtplib  
+import socket   
 from odoo.tools.mail import email_normalize
-from datetime import date
+from datetime import date, datetime
+import logging
+
+_logger = logging.getLogger(__name__)
 
 class Cancellation(models.Model):
   """
@@ -19,17 +24,18 @@ class Cancellation(models.Model):
   situation = fields.Selection([
     ('0', ' '),
     ('1', 'Riesgo 1 - Sin notificar'),
-    ('2', 'Riesgo 1 - Notificado'),
-    ('3', 'Riesgo 2 - Pendiente de llamada'),
-    ('4', 'Riesgo 2 - Llamada realizada'),
-    ('5', 'Justificada'),
-    ('6', 'Iniciado proceso de anulación'),
-    ('7', 'Fin proceso de anulación'),
+    ('2', 'Riesgo 1 - En proceso'),
+    ('3', 'Riesgo 1 - Notificado'),
+    ('4', 'Riesgo 2 - Pendiente de llamada'),
+    ('5', 'Riesgo 2 - Llamada realizada'),
+    ('6', 'Justificada'),
+    ('7', 'Iniciado proceso de anulación'),
+    ('8', 'Fin proceso de anulación'),
     ], string = 'Situación', default = '0',
     readonly = True)
 
-  notification_date = fields.Date(string = 'Fecha de notificación por mail', 
-                                help = 'Fecha de notificación por mail')
+  notification_date = fields.Date(string = 'Fecha de notificación R1', 
+                                help = 'Fecha de notificación de alumno en riesgo 1 por mail')
 
   query_date = fields.Datetime(string = 'Fecha de la consulta', 
                                 help = 'Día y hora en el que se realizó la consulta a Moodle')
@@ -253,11 +259,28 @@ class Cancellation(models.Model):
     
     template = self.env.ref('maya_students.email_template_cancellation_risk1')
 
-    render_context = {
-        'include_all_subjects': include_all_subjects
-    }
-
     template.mail_server_id = mail_server.id
-    template.send_mail(self.id, force_send=True, 
-                       email_values=email_values)
+    try:
+      template.send_mail(self.id, force_send=True, 
+                           email_values=email_values)
+      
+      self.write({
+        'situation': '3',  # -> 'Riesgo 1 - Notificado'
+        'notification_date': datetime.now().date()
+      })
+    
+    except UserError as e:
+      # error de Odoo (plantilla mal configurada, faltan datos...)
+      _logger.warning(f"Error al enviar email a {self.student_name}: {str(e)}")
+      raise e
+
+    except (smtplib.SMTPException, socket.error) as e:
+      # error de red o del Servidor SMTP (no hay conexión, auth fallida...)
+      _logger.error(f"Error de Red/SMTP al enviar email a {self.student_name}: {str(e)}")
+      raise UserError(f"No se pudo contactar con el servidor de correo. Error: {str(e)}")
+
+    except Exception as e:
+      # cualquier otro error inesperado
+      _logger.error(f"Error inesperado al enviar email a {self.student_name}: {str(e)}")
+      raise UserError(f"Ocurrió un error inesperado al enviar el correo: {str(e)}")
 
