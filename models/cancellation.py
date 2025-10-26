@@ -2,7 +2,7 @@
 
 from odoo import api, models, fields
 from odoo.exceptions import UserError
-
+from odoo.tools.mail import email_normalize
 from datetime import date
 
 class Cancellation(models.Model):
@@ -161,7 +161,7 @@ class Cancellation(models.Model):
     email_list = teacher_rels.mapped('employee_id').mapped('work_email') 
 
     # Filtro emails vacíos y los uno con comas
-    valid_emails = [email for email in email_list if email]
+    valid_emails = [email for email in email_list if email_normalize(email)]
     
     return ','.join(valid_emails)
 
@@ -171,6 +171,11 @@ class Cancellation(models.Model):
     """
     self.ensure_one()
 
+    # emails  TO, CC y REPLY
+    email_to = self.student_email_corp if email_normalize(self.student_email_corp) else ''
+    email_cc = ','.join([email for email in (self.student_email, self.student_email_support) if email_normalize(email)])
+    reply_to = self._get_teachers_reply_to_emails()
+
     # compruebo que hay un email al menos
     if not self.student_email and not self.student_email_support and not self.student_email_corp:
       raise UserError(
@@ -178,15 +183,29 @@ class Cancellation(models.Model):
           f"El estudiante {self.student_name} no tiene ningún email configurado."
       )
 
-
     # Busco el servidor de correo del centro
     mail_alias = self.env['ir.config_parameter'].get_param('maya_core.alias_mail_center')
+    if not mail_alias:
+      print(f'\033[0;31m[ERROR]\033[0m No se ha definido el servidor de correo del centro')
+      return
+    
     mail_server = self.env['ir.mail_server'].search([('name', '=', mail_alias)], limit=1)
     if not mail_server:
         raise UserError(f"No se encontró el servidor de correo o no ha sido configurado {mail_alias}.")
     
+    email_from = '"CEED Notificaciones" <'+ mail_server.smtp_user + '>' 
+
+    email_values = {
+        'email_from': email_from,
+        'email_to': email_to,
+        'email_cc': email_cc,
+        'reply_to': reply_to,
+        # por si existieran contactos en res.partner, que no los busque
+        'recipient_ids': [], 
+    }
+    
     template = self.env.ref('maya_students.email_template_cancellation_risk1')
 
     template.mail_server_id = mail_server.id
-    template.send_mail(self.id, force_send=True)
+    template.send_mail(self.id, force_send=True, email_values=email_values)
 
