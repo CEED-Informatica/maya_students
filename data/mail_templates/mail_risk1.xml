@@ -9,6 +9,9 @@
       <field name="body_html"><![CDATA[
 <div style="margin: 0px; padding: 0px;">
   <style>
+    /* Utilizo pixels como unidad ya que es más seguro pensando en que es un mail */
+    /* El lector de correos puede generar div que no puedo controlar */
+
     /* Estilos para las tarjetas de módulo */
     .module-card {
       border-collapse: collapse;
@@ -54,21 +57,28 @@
   <p style="margin: 0px; padding: 0px; font-size: 14px;">
     Estimado/a estudiante,  
     <br/><br/>
+
     <t t-out="object.subject_student_rel_id.student_id.student_info"/><br/>
     <t t-out="object.subject_student_rel_id.course_id.abbr"/><br/>
     <t t-out="object.subject_student_rel_id.student_id.nia"/><br/><br/>
+  </p>
+
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
     De acuerdo con la RESOLUCIÓN de 17 de julio de 2025, de la Secretaría Autonómica de Educación,  
     por la que se dictan instrucciones sobre ordenación académica y de organización de los centros  
     que impartan los grados D y E de Formación Profesional durante el curso 2025-2026 en
     la Comunidad Valenciana, le informamos que se ha detectado una inactividad en su participación
     en el curso durante los últimos 8 días lectivos.  
-    <br/>
+  </p>
+
+  <!-- lo utilizo como espaciador para poder gestionar mejor el alto de línea -->
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
     En cumplimiento de lo dispuesto en las Instrucciones de Inicio de Curso 2025-2026,  
     <strong>se requiere que acceda al aula virtual</strong> de los siguientes módulos para continuar con su formación.  
   </p>
 
-  <t t-if="ctx.get('include_all_subjects')">
-      
+  <t t-if="ctx.get('include_all_subjects')">    
     <t t-foreach="object.related_cancellations_ids" t-as="cancel">
       <table class="module-card" role="presentation" style="border-collapse: collapse; width: 80%; margin-top: 15px; margin-bottom: 15px; margin-left: auto; margin-right: auto; border: 1px solid #ccc; font-size: 13px;">
         <tr>
@@ -86,10 +96,25 @@
               <strong>Aula Virtual:</strong>
               <a t-att-href="cancel.classroom_link" style="color: #007bff; text-decoration: none;">Acceder al Aula</a>
             </p>
-            <p style="margin: 0px 0px 0px 0px; padding: 0px;">
-              <strong>Profesorado:</strong>
-              <!--<a t-att-href="'mailto:' + (cancel._get_teachers_reply_to_emails() or '')" style="color: #007bff; text-decoration: none;">Contactar</a> -->
-            </p>
+
+            <table role="presentation" style="border-collapse: collapse; width: 100%; font-size: 13px; line-height: 1.6;">
+              <tr>
+                <td style="width: 1%; white-space: nowrap; vertical-align: top; padding: 0; padding-right: 3px; margin: 0; font-weight: bold;">
+                  Profesorado:
+                </td>
+                <td style="vertical-align: top; padding: 0; margin: 0;">
+                  <t t-foreach="cancel.teacher_employee_ids" t-as="teacher">
+                    <a t-att-href="'mailto:' + (teacher.work_email or '')" 
+                      style="color: #007bff; text-decoration: none; display: block; margin-bottom: 3px;">
+                      <t t-out="teacher.surname"/>, <t t-out="teacher.name"/>
+                    </a>
+                  </t>
+                  <t t-if="not object.teacher_employee_ids">
+                    (No asignado)
+                  </t>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
       </table>
@@ -112,29 +137,50 @@
             <strong>Aula Virtual:</strong>
             <a t-att-href="object.classroom_link" style="color: #007bff; text-decoration: none;">Acceder al Aula</a>
           </p>
-          <p style="margin: 0px 0px 0px 0px; padding: 0px;">
-            <strong>Profesorado:</strong>
-            <!--<a t-att-href="'mailto:' + (object._get_teachers_reply_to_emails() or '')" style="color: #007bff; text-decoration: none;">Contactar</a> -->
-          </p>
+
+          <table role="presentation" style="border-collapse: collapse; width: 100%; font-size: 13px; line-height: 1.6;">
+            <tr>
+              <td style="width: 1%; white-space: nowrap; vertical-align: top; padding: 0; padding-right: 3px; margin: 0; font-weight: bold;">
+                Profesorado:
+              </td>
+              <td style="vertical-align: top; padding: 0; margin: 0;">
+                <t t-foreach="object.teacher_employee_ids" t-as="teacher">
+                  <a t-att-href="'mailto:' + (teacher.work_email or '')" 
+                    style="color: #007bff; text-decoration: none; display: block; margin-bottom: 3px;">
+                    <t t-out="teacher.surname"/>, <t t-out="teacher.name"/>
+                  </a>
+                </t>
+                <t t-if="not object.teacher_employee_ids">
+                  (No asignado)
+                </t>
+              </td>
+            </tr>
+          </table>
+    
         </td>
       </tr>
     </table>
   </t>
 
   <p style="margin: 0px; padding: 0px; font-size: 14px;">
-    <br/>
     En caso de no registrar actividad en los próximos 2 días lectivos, procederemos a iniciar el proceso de baja de oficio, según la normativa vigente.  
-    <br/>
+  </p>
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
     Si existen circunstancias especiales que hayan impedido su conexión, le rogamos que presente las  
-    alegaciones correspondientes en este plazo de 2 días, contactando directamente con el profesorado del módulo.  
-    <strong>No llamar al centro</strong>.  
-    <br/>
+    alegaciones correspondientes en este plazo de 2 días, contactando directamente con el profesorado del módulo.
+    <strong>No llame al centro</strong>.
+  </p>
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
     Queremos reiterar nuestro compromiso con su formación y apoyarle en su proceso educativo. Si considera que este correo  
     puede deberse a un error, no dude en comunicarse con el profesorado del módulo.  
-    <br/>
-    Atentamente,  
-    <br/>
   </p>
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    Atentamente,  
+  </p>
+  <br/>
 </div>
 ]]></field>
     </record>

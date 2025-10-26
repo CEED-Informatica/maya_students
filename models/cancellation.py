@@ -72,6 +72,11 @@ class Cancellation(models.Model):
   classroom_moodle_id = fields.Integer(string = 'Id aula Moodle')
   classroom_link = fields.Char(string = 'Enlace al aula', compute = '_compute_link_classroom')
 
+  teacher_employee_ids = fields.Many2many('maya_core.employee',
+        string='Profesorado asociado al módulo',
+        compute='_compute_teacher_employees',
+  )
+
   _sql_constraints = [(
     'unique_subject_student_rel_id',
     'unique(subject_student_rel_id)',
@@ -137,7 +142,6 @@ class Cancellation(models.Model):
       else:
         record.classroom_link = ''
 
-  
   def clear_justification_date(self):
     """
     Quita la fecha de la justificación
@@ -157,6 +161,32 @@ class Cancellation(models.Model):
     else: # después del 31 de agosto, el 3o de junio del año que viene
       self.justification_end_date = date(current_year + 1, 6, 30)
 
+  @api.depends('subject_student_rel_id.subject_id', 'subject_student_rel_id.course_id')
+  def _compute_teacher_employees(self):
+    """
+    Calcula los registros maya_core.employee de los profesores
+    asociados a este módulo y ciclo.
+    """
+    for record in self:
+      if not record.subject_student_rel_id.subject_id or not record.subject_student_rel_id.course_id:
+        record.teacher_employee_ids = False
+        continue
+                
+      teacher_rel = self.env['maya_core.subject_employee_rel']
+        
+      teacher_rels = teacher_rel.search([
+            ('subject_id', '=', self.subject_student_rel_id.subject_id.id),
+            ('course_id', '=', self.subject_student_rel_id.course_id.id)
+      ])
+                        
+      # De las relaciones encontradas, extraigo los profesores
+      teacher_list = teacher_rels.mapped('employee_id') 
+    
+      # Filtro solo los que tienen email válido (deberian ser todos)
+      valid_employees = teacher_list.filtered(lambda emp: email_normalize(emp.work_email))
+
+      record.teacher_employee_ids = valid_employees
+
 
   def _get_teachers_reply_to_emails(self):
     """
@@ -165,21 +195,12 @@ class Cancellation(models.Model):
     separados por coma.
     """
     self.ensure_one()
-
-    teacher_rel = self.env['maya_core.subject_employee_rel']
-        
-    teacher_rels = teacher_rel.search([
-        ('subject_id', '=', self.subject_student_rel_id.subject_id.id),
-        ('course_id', '=', self.subject_student_rel_id.course_id.id)
-    ])
-
-    # De las relaciones encontradas, extraigo los profesores y de ellos los emails
-    email_list = teacher_rels.mapped('employee_id').mapped('work_email') 
-
-    # Filtro emails vacíos y los uno con comas
-    valid_emails = [email for email in email_list if email_normalize(email)]
     
-    return ','.join(valid_emails)
+    email_list = self.teacher_employee_ids.mapped('work_email')
+
+    # ya está compropbado que sean correctos
+    return ','.join(email_list)
+  
   
   def send_notification_mail_subject(self):
     """
