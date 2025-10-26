@@ -96,6 +96,8 @@
               <group>
                 <field name="comments" />
               </group>
+            </page>            
+            <page string='Notificaciones'>
             </page>
             <page string='Otras anulaciones'>
               <field name="related_cancellations_ids" readonly="1">
@@ -107,7 +109,14 @@
                 </tree>
               </field>
             </page>
-            <page string='Notificaciones'>
+            <page string='Profesorado'>
+              <field name="teacher_employee_ids" readonly="1">
+                <tree>
+                  <field name="surname"/>
+                  <field name="name"/>
+                  <field name="work_email"/>
+                </tree>
+              </field>
             </page>
           </notebook>
         </form>
