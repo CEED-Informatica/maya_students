@@ -162,6 +162,19 @@
       <field name="context">{'module': 'maya_students'}</field>
     </record>
 
+    <!-- action server para la sincronización de los estudiantes con itaca-->
+    <record model="ir.actions.server" id="maya_students.action_send_mail_notification_cancellation_agruped">
+      <field name="name">Enviar notificación de anulación de oficio (agrupada)</field>
+      <field name="type">ir.actions.server</field>
+      <field name="model_id" ref="maya_students.model_maya_students_cancellation"/>
+      <field name="binding_model_id" ref="maya_students.model_maya_students_cancellation"/> 
+      <field name="binding_view_types">list,form</field>
+      <field name="state">code</field>
+      <field name="code">
+          action = records.send_notification_mail_subject_agruped()
+      </field>
+    </record>
+
     <!-- Top menu item -->
     <menuitem name="Maya | Estudiantes" id="maya_students.menu_root" sequence="4"/>
 

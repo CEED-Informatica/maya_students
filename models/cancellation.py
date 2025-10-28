@@ -193,7 +193,22 @@ class Cancellation(models.Model):
 
       record.teacher_employee_ids = valid_employees
 
-
+  #################################
+  #### ENVIO DE NOTIFICACIONES #### 
+  #################################
+  def _get_mail_server(self):
+    """
+    Busca y devuelve el mail.server del centro configurado (o lanza UserError).
+    """
+    mail_alias = self.env['ir.config_parameter'].get_param('maya_core.alias_mail_center')
+    if not mail_alias:
+        raise UserError("No se ha definido el servidor de correo del centro (param maya_core.alias_mail_center).")
+    mail_server = self.env['ir.mail_server'].search([('name', '=', mail_alias)], limit=1)
+    if not mail_server:
+        raise UserError(f"No se encontró el servidor de correo '{mail_alias}' en ir.mail_server.")
+    
+    return mail_server
+  
   def _get_teachers_reply_to_emails(self):
     """
     Busca todos los profesores asociados al módulo y ciclo
@@ -207,16 +222,123 @@ class Cancellation(models.Model):
     # ya está compropbado que sean correctos
     return ','.join(email_list)
   
+  def _generate_mail_from_template(self, record, mail_server, include_all_cancellations = False):
+    """
+    Genera (crea) un registro mail.mail a partir de la plantilla para el main_record.
+    No hace cambios de estado aquí. Devuelve la mail.mail creada.
+    - related_ids: lista de ids de anulaciones incluidas en este paquete (excluyendo el main).
+    - include_all_subjects: si True se activa ctx include_all_modules para mostrar todas las subs.
+    """
+    self.ensure_one() 
+
+    template = self.env.ref('maya_students.email_template_cancellation_risk1')
+  
+    # emails  TO, CC y REPLY
+    email_from = f'"CEED Notificaciones" <{mail_server.smtp_user}>'
+    email_to = record.student_email_corp if email_normalize(record.student_email_corp) else ''
+    email_cc = ','.join([email for email in (record.student_email, record.student_email_support) if email_normalize(email)])
+    reply_to = record._get_teachers_reply_to_emails()
+
+    email_values = {
+      'email_from': email_from,
+      'email_to': email_to,
+      'email_cc': email_cc,
+      'reply_to': reply_to,
+      # por si existieran contactos en res.partner, que no los busque
+      'recipient_ids': [], 
+    }
+
+    email_values['mail_server_id'] = mail_server.id
+
+    # Ponemos en contexto si queremos incluir todas las anulaciones del estudiante
+    #tmpl = template.with_context(include_all_cancellations = include_all_cancellations)
+
+    # generate_email devuelve un dict con valores para crear mail.mail
+    #render_mail_data = tmpl.render_data([record.id], email_values=email_values)
+
+    render_context = {'include_all_cancellations': include_all_cancellations}
+
+    # renderizo los elementos del template que son dionamicos 
+    # (pongo el subject por si lo es en un futuro)
+    # el resto de campos (CC, TOm, FROM...) los fijo por código, no están en plantilla
+    subject_rendered = template._render_template(
+        template.subject, 
+        template.model, 
+        [record.id], 
+        add_context=render_context
+    )
+    
+    body_rendered = template._render_field(
+        'body_html',  
+        [record.id], 
+        add_context=render_context
+    )
+
+    email_data = email_values.copy()
+    
+    email_data.update({
+        'subject': subject_rendered.get(record.id, ''),
+        'body_html': body_rendered.get(record.id, ''),
+        'model': template.model,
+        'res_id': record.id,
+    })
+
+    return email_data
   
   def send_notification_mail_subject(self):
     """
     Fuerza el envio de un mail de notificación al alumno por una anulación
     """
     self.ensure_one()
-    self.send_notification_mail()
+
+    email_data = self._generate_mail_from_template(self, 
+                                      self._get_mail_server(), 
+                                      include_all_cancellations = False)
+
+    try:
+      mail = self.env['mail.mail'].create(email_data)
+      mail.send()
+      
+      self.write({
+        'situation': '3',  # -> 'Riesgo 1 - Notificado'
+        'notification_date': datetime.now().date()
+      })
+    
+    except UserError as e:
+      # error de Odoo (plantilla mal configurada, faltan datos...)
+      _logger.warning(f"Error al enviar email a {self.student_name}: {str(e)}")
+      raise e
+
+    except (smtplib.SMTPException, socket.error) as e:
+      # error de red o del Servidor SMTP (no hay conexión, auth fallida...)
+      _logger.error(f"Error de Red/SMTP al enviar email a {self.student_name}: {str(e)}")
+      raise UserError(f"No se pudo contactar con el servidor de correo. Error: {str(e)}")
+
+    except Exception as e:
+      # cualquier otro error inesperado
+      _logger.error(f"Error inesperado al enviar email a {self.student_name}: {str(e)}")
+      raise UserError(f"Ocurrió un error inesperado al enviar el correo: {str(e)}")
+
+
+
+  def send_notification_mail_subject_agruped(self):
+    """
+    Prepara y envia de manera agrupada por NIA los mensajes de 
+    notificación de las anulaciones de oficio
+    """
+
+    mail_server = self._get_mail_server()
+
+    for record in self:
+      print("mando mail")
+
+
+
 
     # para incluir a todos los módulos
     #record.with_context(include_all_modules=True).send_notification_mail()
+
+
 
   def send_notification_mail(self, include_all_subjects=False):
     """
