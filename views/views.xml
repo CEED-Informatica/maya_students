@@ -56,7 +56,8 @@
                       type="object"
                       string="Forzar envio mail"
                       icon="fa-envelope"
-                      class="btn-secondary text-nowrap"/>
+                      class="btn-secondary text-nowrap"
+                      confirm="Este acción enviará una notificación por correo electrónico al estudiante alertandole de su riesgo actual SÓLO por este módulo (no se tienen en cuenta otras posibles anulaciones relacionadas). ¿Deseas continuar?"/>
             </group>
           </group>
           <separator string="Información" style="padding-bottom:15px"/>
