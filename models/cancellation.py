@@ -181,8 +181,8 @@ class Cancellation(models.Model):
       teacher_rel = self.env['maya_core.subject_employee_rel']
         
       teacher_rels = teacher_rel.search([
-            ('subject_id', '=', self.subject_student_rel_id.subject_id.id),
-            ('course_id', '=', self.subject_student_rel_id.course_id.id)
+            ('subject_id', '=', record.subject_student_rel_id.subject_id.id),
+            ('course_id', '=', record.subject_student_rel_id.course_id.id)
       ])
                         
       # De las relaciones encontradas, extraigo los profesores
@@ -219,7 +219,7 @@ class Cancellation(models.Model):
     
     email_list = self.teacher_employee_ids.mapped('work_email')
 
-    # ya está compropbado que sean correctos
+    # ya está comprobado que sean correctos
     return ','.join(email_list)
   
   def _generate_mail_from_template(self, record, mail_server, include_all_cancellations = False):
@@ -250,28 +250,26 @@ class Cancellation(models.Model):
 
     email_values['mail_server_id'] = mail_server.id
 
+    record.teacher_employee_ids  # fuerza el compute principal
+
+    if include_all_cancellations:
+      for rel in record.related_cancellations_ids:
+        rel.teacher_employee_ids  # fuerza el compute de las relacionadas
+
     # Ponemos en contexto si queremos incluir todas las anulaciones del estudiante
-    #tmpl = template.with_context(include_all_cancellations = include_all_cancellations)
-
-    # generate_email devuelve un dict con valores para crear mail.mail
-    #render_mail_data = tmpl.render_data([record.id], email_values=email_values)
-
-    render_context = {'include_all_cancellations': include_all_cancellations}
+    tmpl = template.with_context(include_all_cancellations = include_all_cancellations)
 
     # renderizo los elementos del template que son dionamicos 
     # (pongo el subject por si lo es en un futuro)
     # el resto de campos (CC, TOm, FROM...) los fijo por código, no están en plantilla
-    subject_rendered = template._render_template(
-        template.subject, 
-        template.model, 
+    subject_rendered = tmpl._render_field(
+        'subject',  
         [record.id], 
-        add_context=render_context
     )
     
-    body_rendered = template._render_field(
+    body_rendered = tmpl._render_field(
         'body_html',  
         [record.id], 
-        add_context=render_context
     )
 
     email_data = email_values.copy()
@@ -291,6 +289,14 @@ class Cancellation(models.Model):
     """
     self.ensure_one()
 
+    # compruebo que haya un email al menos
+    student_email_ok = any([email_normalize(x) for x in (self.student_email_corp, self.student_email, self.student_email_support) if x])
+    if not student_email_ok:
+      raise UserError(
+          f"¡Acción no permitida! \n\n"
+          f"El estudiante {self.student_name} no tiene ningún email configurado."
+      )
+
     email_data = self._generate_mail_from_template(self, 
                                       self._get_mail_server(), 
                                       include_all_cancellations = False)
@@ -303,7 +309,21 @@ class Cancellation(models.Model):
         'situation': '3',  # -> 'Riesgo 1 - Notificado'
         'notification_date': datetime.now().date()
       })
+
+      message = f'Mensaje enviado correctamente a [{self.student_nia}] {self.student_name}. '  
+
+      return {
+        'type': 'ir.actions.client',
+        'tag': 'display_notification',
+        'params': {
+            'title': 'Notificación enviada',
+            'message': message,
+            'type': 'info',  # 'success', 'warning', 'danger', 'info'
+            'sticky': False,
+        }
+      }
     
+    # no hace falta que revierta nada si hay error ya que la situation sigue estando en '1'
     except UserError as e:
       # error de Odoo (plantilla mal configurada, faltan datos...)
       _logger.warning(f"Error al enviar email a {self.student_name}: {str(e)}")
@@ -319,24 +339,208 @@ class Cancellation(models.Model):
       _logger.error(f"Error inesperado al enviar email a {self.student_name}: {str(e)}")
       raise UserError(f"Ocurrió un error inesperado al enviar el correo: {str(e)}")
 
-
-
   def send_notification_mail_subject_agruped(self):
     """
     Prepara y envia de manera agrupada por NIA los mensajes de 
     notificación de las anulaciones de oficio
     """
+    ## TODO parametrizae
+    NUM_DIAS_AVISO = 2
 
+    skipped = []        # lista de tuplas (id, motivo) de anulaciones que se saltan
+    already_processed_in_memory = set()  # ids de cancellations ya incluidas en paquetes para ser notificadas (evita duplicados)
+    generation_errors = [] # errores de generación de correos
+
+    # Estructuras para generar mails y mapear paquetes (están pareadas).
+    mails_to_create = []   # lista de dicts con email_values
+    packages = []          # lista de dicts {'main_id': int, 'related_ids': [int,...]} para cambiar la situation si el envio ha sido correcto
+    
     mail_server = self._get_mail_server()
+    today = fields.Date.today()
 
     for record in self:
-      print("mando mail")
+      # Ausencias justificadas
+      if record.situation == '6':  
+      
+        # si justificada y fecha vigente -> ignorar
+        if record.justification_end_date and today <= record.justification_end_date:
+          skipped.append((record.id, 'justificada_vigente'))
+          continue
+        else:
+          # caducada -> pasar a '1' para procesarse en este bucle
+          try:
+            record.write({'situation': '1'})
+          except Exception as e:
+            _logger.error(f"Error escribiendo situación '1' para {record.id}: {str(e)}")
+            skipped.append((record.id, 'error_write_6->1'))
+            continue
+
+      # ya está notificada
+      if record.situation == '3':
+        if record.notification_date:
+          days = (today - record.notification_date).days
+          if days >= NUM_DIAS_AVISO:
+            try:
+              record.write({'situation': '4'})  # pasa a pendiente de llamada
+              skipped.append((record.id, 'R1_notificada->R2_pendiente'))
+            except Exception as e:
+              _logger.error(f"Error escribiendo situación '4' para {record.id}: {str(e)}")
+              skipped.append((record.id, 'error_write_3->4'))
+          else:
+              skipped.append((record.id, f'notificada_reciente_{days}d'))
+        else:
+          # sin fecha, por seguridad la ignorao, aunque no debería de ocurrir
+          skipped.append((record.id, '3_sin_fecha'))
+          continue
+
+      # Llegados a este punto, cualquier situation que no sea R1 sin notificar, no se procesa)
+      if record.situation != '1':
+        skipped.append((record.id, f'no_envio_sit_{record.situation}'))
+        continue
+        
+      # Sin notificación -> vamos a preparar paquete
+      # Seleccionamos related a incluir: relacionadas que no estén ya en '2' ni en '3'
+      # El resto de situaciones ya estarían contempladas
+      related_to_include = record.related_cancellations_ids.filtered(lambda c: c.situation == '1' and c.id not in already_processed_in_memory)
+
+      # compruebo que haya un email al menos
+      student_email_ok = any([email_normalize(x) for x in (record.student_email_corp, record.student_email, record.student_email_support) if x])
+      if not student_email_ok:
+        skipped.append((record.id, 'sin_email'))
+        continue
+
+      # Marco el registro y sus relacionados como '2' para que no 
+      # se procesen en otro proceso
+      try:
+        # el registro actual
+        record.write({'situation': '2'})
+        # marcamos related -> '2' (si los hay)
+        if related_to_include:
+          related_to_include.write({'situation': '2'})
+      except Exception as e:
+        _logger.error(f"Error poniendo en proceso de notificación la anulación (1->2) {record.id}: {str(e)}")
+        # si falla la escritura, revertimos cualquier write parcial y saltamos
+        try:
+          record.write({'situation': '1'})
+          if related_to_include:
+            related_to_include.write({'situation': '1'})
+        except Exception:
+          pass
+
+        skipped.append((record.id, f'error_en_proceso_1->2:{str(e)}'))
+        continue
+
+      # Las añado al set para no incluirlas dos veces
+      already_processed_in_memory.add(record.id)
+      for r in related_to_include:
+        already_processed_in_memory.add(r.id)
+
+
+      # genero el email_values con el template (no se envía aún)
+      try:
+        email_values = record._generate_mail_from_template(record, mail_server, include_all_cancellations=True)
+        
+        mails_to_create.append(email_values)
+        packages.append({
+            'main_id': record.id,
+            'related_ids': related_to_include.ids,
+        })
+      except Exception as e:
+        _logger.error(f"Error generando mail para anulación {record.id}: {str(e)}")
+        generation_errors.append((record.id, str(e)))
+
+        # revierto las anulaciones "en proceso" para permitir reprocesarlo luego
+        try:
+          record.write({'situation': '1'})
+          if related_to_include:
+            related_to_include.write({'situation': '1'})
+        except Exception as e2:
+            _logger.error(f"Error revirtiendo situación tras fallo generación para {record.id}: {str(e2)}")
+        continue
+
+
+    total_created = 0 # numero de notificaciones creadas (ojo! no enviadas, que por una notificación puede haber vbarios remitentes)
+    total_sent = 0
+    total_failed = 0
+
+    # envio de correos
+    if mails_to_create:
+      try:
+        created_mail_records = self.env['mail.mail'].create(mails_to_create)
+      except Exception as e:
+        # fallo criticó creando mails en BD: revierto todas las reservas hechas
+        _logger.error(f"Error creando registros mail.mail: {str(e)}")
+        
+        for pkg in packages:
+          try:
+              self.browse([pkg['main_id']] + pkg.get('related_ids', [])).write({'situation': '1'})
+          except Exception as e2:
+              _logger.error(f"Error revirtiendo paquete {pkg}: {e2}")
+        raise UserError(f"Error creando los mensajes de correo: {str(e)}")
+
+      total_created = len(created_mail_records)
+
+      # Envio de mail y actualizo situation en función del resultado
+      for mail_rec, pkg in zip(created_mail_records, packages):
+        main_id = pkg.get('main_id')
+        related_ids = pkg.get('related_ids', [])
+        try:
+          mail_rec.send()
+          total_sent += 1
+
+          # si ha ido bien situation -> '3'
+          try:
+            self.browse(main_id).write({
+                'situation': '3',
+                'notification_date': today
+            })
+          except Exception as e:
+            _logger.error(f"No se pudo poner la anulación {main_id} a 'R1 - notificada' tras el envío: {str(e)}")
+
+          if related_ids:
+            try:
+              self.browse(related_ids).write({'situation': '3'})
+            except Exception as e:
+              _logger.error(f"No se pudo poner ralgunas de las anulaciones relacionadas {related_ids} a 'R1 - notificada' tras envío: {str(e)}")
+
+        except (smtplib.SMTPException, socket.error) as e:
+          total_failed += 1
+          _logger.error(f"Error de Red/SMTP al enviar email a {mail_rec.id} para la anulación {main_id}: {str(e)}")
+          # Cambio la situation a '1' para permitir reintento (podrían estar en '2')
+          try:
+            self.browse([main_id] + related_ids).write({'situation': '1'})
+          except Exception as e2:
+            _logger.error(f"Error revirtiendo situación a 'R1 - sin notificar' para la anulación {main_id}: {str(e2)}")
+
+        except Exception as e:
+          total_failed += 1
+          _logger.error(f"Error inesperado enviando mail id {mail_rec.id} para la anulación {main_id}: {str(e)}")
+          try:
+            self.browse([main_id] + related_ids).write({'situation': '1'})
+          except Exception as e2:
+            _logger.error(f"Error revirtiendo situación a '1' para la anuladción {main_id}: {str(e2)}")
 
 
 
+    # info sobre generation_errors y skipped
+    if generation_errors:
+        _logger.warning(f"Errores generando correo: {generation_errors}")
+    if skipped:
+        _logger.info(f"Anulaciones no procesadas: {skipped}")
 
-    # para incluir a todos los módulos
-    #record.with_context(include_all_modules=True).send_notification_mail()
+    # Finalmente mostramos notificación UI
+    msg = (f"Mensajes creados: {total_created}. Enviados: {total_sent}. Fallidos: {total_failed}. "
+           f"Omitidos: {len(skipped)}. Errores generación: {len(generation_errors)}.")
+    return {
+        'type': 'ir.actions.client',
+        'tag': 'display_notification',
+        'params': {
+            'title': 'Proceso de notificaciones agrupadas completado',
+            'message': msg,
+            'type': 'success' if total_failed == 0 and len(generation_errors) == 0 else 'warning',
+            'sticky': False,
+        }
+    }
 
 
 
