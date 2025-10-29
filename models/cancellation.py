@@ -209,18 +209,41 @@ class Cancellation(models.Model):
     
     return mail_server
   
-  def _get_teachers_reply_to_emails(self):
+  def _get_teachers_reply_to_emails(self, include_all_cancellations = False):
     """
     Busca todos los profesores asociados al módulo y ciclo
     de esta anulación y devuelve un string con sus emails 
     separados por coma.
+
+    include_all_cancellations: si True incluye en el reply a todos los profesores 
+    de todas las anulaciones relacionadas
     """
     self.ensure_one()
-    
-    email_list = self.teacher_employee_ids.mapped('work_email')
 
-    # ya está comprobado que sean correctos
-    return ','.join(email_list)
+    # fuerza el compute de los profesores
+    self.teacher_employee_ids  # asegura cálculo para el registro principal
+
+    employees = self.teacher_employee_ids
+    if include_all_cancellations:
+      # fuerzo el compute de los profesores y añado a employee los nuevos
+      for rel in self.related_cancellations_ids:
+        rel.teacher_employee_ids
+        employees |= rel.teacher_employee_ids
+    
+    email_list = employees.mapped('work_email')
+    
+    # comprobación de que son válidos
+    valid = [email for email in (email_list or []) if email_normalize(email)]
+
+    # Elimino profes duplicados
+    seen = set()
+    unique = []
+    for e in valid:
+      if e not in seen:
+        seen.add(e)
+        unique.append(e)
+
+    return ','.join(unique)
   
   def _generate_mail_from_template(self, record, mail_server, include_all_cancellations = False):
     """
@@ -237,7 +260,7 @@ class Cancellation(models.Model):
     email_from = f'"CEED Notificaciones" <{mail_server.smtp_user}>'
     email_to = record.student_email_corp if email_normalize(record.student_email_corp) else ''
     email_cc = ','.join([email for email in (record.student_email, record.student_email_support) if email_normalize(email)])
-    reply_to = record._get_teachers_reply_to_emails()
+    reply_to = record._get_teachers_reply_to_emails(include_all_cancellations)
 
     email_values = {
       'email_from': email_from,
@@ -250,11 +273,12 @@ class Cancellation(models.Model):
 
     email_values['mail_server_id'] = mail_server.id
 
-    record.teacher_employee_ids  # fuerza el compute principal
+    # fuerza el compute de los profesores
+    record.teacher_employee_ids
 
     if include_all_cancellations:
       for rel in record.related_cancellations_ids:
-        rel.teacher_employee_ids  # fuerza el compute de las relacionadas
+        rel.teacher_employee_ids  
 
     # Ponemos en contexto si queremos incluir todas las anulaciones del estudiante
     tmpl = template.with_context(include_all_cancellations = include_all_cancellations)
