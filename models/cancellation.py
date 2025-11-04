@@ -10,6 +10,12 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+ERROR_MAP = {
+    "A01": "El alumno está matriculado en varios ciclos y, \
+    al pertenecer este módulo a un aula compartida, no es posible \
+    concretar a cual de ellos pertenece su matrícula.",
+}
+
 class Cancellation(models.Model):
   """
   Anulaciones de matrícula
@@ -83,11 +89,36 @@ class Cancellation(models.Model):
         compute='_compute_teacher_employees',
   )
 
+  # para mostrar diferentes errores en pantalla
+  error_codes = fields.Char(
+    string="Códigos de error",
+    default='',
+    help="Códigos de error asociados a la anulación separados por comas"
+  )
+
+  error_descriptions = fields.Text(
+    string="Errores detectados",
+    compute="_compute_error_descriptions",
+    store=False
+  )
+
   _sql_constraints = [(
     'unique_subject_student_rel_id',
     'unique(subject_student_rel_id)',
     'Cada relación Subject-Student sólo puede tener una anulación de matrícula.'
   )]
+
+  @api.depends('error_codes')
+  def _compute_error_descriptions(self):
+    for record in self:
+      if not record.error_codes:
+          record.error_descriptions = ""
+          continue
+
+      codes = [c.strip() for c in record.error_codes.split(',') if c.strip()]
+      descs = [f"[{code}] {ERROR_MAP.get(code, 'Error desconocido')}" for code in codes]
+      record.error_descriptions = "\n".join(descs)
+
 
   @api.depends('subject_student_rel_id')
   def _compute_related_cancellations(self):

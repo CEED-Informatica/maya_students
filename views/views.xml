@@ -33,6 +33,9 @@
       <field name="model">maya_students.cancellation</field>
       <field name="arch" type="xml">
         <form>
+          <xpath expr="//style" position="after">
+            <link rel="stylesheet" href="/maya_core/static/css/maya_core_styles.css"/>
+          </xpath> 
           <group col='3'>
             <group>
               <field name="student_name" />
@@ -70,6 +73,9 @@
               <field name="query_date" readonly="1"/> 
               <field name="classroom_link" widget="url" readonly="1"/>
             </group>
+          </group>
+          <group string="Avisos" invisible="[('error_descriptions', '=', False)]">
+            <field name="error_descriptions" class="info" nolabel="1" readonly="1" colspan="2"/>
           </group>
           <notebook>
             <page string='Justificación'>

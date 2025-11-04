@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 from odoo import models, api, fields
+from odoo.exceptions import UserError
 import logging
 
 from ....maya_core.support.maya_logger.exceptions import MayaException
@@ -13,7 +14,7 @@ from ....maya_core.support.maya_moodleteacher.maya_moodle_user import MayaMoodle
 from ....maya_core.models.cron_register_jobs.cron_job_enrol_users import CronJobEnrolUsers
 from ....maya_core.models.student import Student
 
-from ....maya_core.support.helper import read_itaca_csv
+from ....maya_core.support.helper import read_itaca_csv, add_error_code
 
 _logger = logging.getLogger(__name__)
 
@@ -72,15 +73,24 @@ class CronCheckAttendanceClassroom(models.TransientModel):
 
     csv_file = '/mnt/odoo-repo/itaca/' + itaca_filename
 
+    errors = []
+
     try:
       df, data_stack = read_itaca_csv(csv_file)
     except Exception as e:
       print(f"\033[0;31m[ERROR]\033[0m Error procesando el fichero csv: {str(e)}")
       return
+    
+    # creo un diccionario con los cursos
+    course_dict = {
+      c.code.strip(): c.id
+      for c in self.env['maya_core.course'].search([])
+      if c.code
+    }
 
     for classroom in check_classrooms_id:
       try:
-        print('\033[0;34m[INFO]\033[0m Obteniendo usuarios del aula ->', classroom[1])  
+        print('\033[0;34m[INFO]\033[0m Obteniendo usuarios del aula -> moodle_id:', classroom[0])  
         
         # obtención de los usuarios 
         users = MayaMoodleUsers.from_course(conn,  classroom[0], only_students = True)
@@ -96,7 +106,6 @@ class CronCheckAttendanceClassroom(models.TransientModel):
           
           if access_datetime < deadline:
             risk_users.append([user, access_datetime])
-
 
         # Preparo los datos para poder eliminar las anulaciones de los alumnos que ya se han
         # conectado
@@ -119,41 +128,70 @@ class CronCheckAttendanceClassroom(models.TransientModel):
         processed_cancellation_ids = set()
 
         for user in risk_users:
-          # los matriculamos en Maya si no lo están
-          maya_user =  CronJobEnrolUsers.enrol_student(self, user[0], classroom[1], course_id) 
-
-          # actualizo sus datos desde Itaca
-          _, record_errors = Student.update_student_data_from_itaca(maya_user, df, data_stack)
-
-          # Lo añado en lista de cancelaciones de oficio
-          subject_student = self.env['maya_core.subject_student_rel']\
-            .search([
-              ('subject_id', '=', classroom[1]),('student_id', '=', maya_user.id),('course_id', '=', course_id)
-              ], limit=1)
-          
-          # lo acabo de matricular luego tiene que devolverme 1 alumno
-          
-          existing_cancellation = self.env['maya_students.cancellation'].search([
-            ('subject_student_rel_id', '=', subject_student.id)
-          ], limit=1)
-
-          if existing_cancellation:   # YA EXISTE: actualizo las fechas
-            existing_cancellation.write(
-              { 'query_date': fields.Datetime.now(),
-                'lastaccess_date': user[1],
-                'classroom_moodle_id': classroom[0] })
-            cancellation = existing_cancellation
-          else:
-            cancellation = self.env['maya_students.cancellation'].create([
-              { 'subject_student_rel_id': subject_student.id,
-                'cancellation_type': 'OFC',
-                'query_date': fields.Datetime.now(),
-                'lastaccess_date': user[1],
-                'situation': '1',
-                'classroom_moodle_id': classroom[0] }])
+          try:
+            error_code = ''
             
-          # si es nueva o sigue en riesgo lo añado al set
-          processed_cancellation_ids.add(cancellation.id)
+            # Crea el estudiante si no existe
+            maya_user =  CronJobEnrolUsers.enrol_student(self, user[0], classroom[1], course_id, only_create=True) 
+
+            # actualizo sus datos desde Itaca
+            _, record_errors = Student.update_student_data_from_itaca(maya_user, df, data_stack, course_dict)
+
+            # para evitar conflictos en aulas compartidas, solo sigo si el alumnno es del
+            # ciclo que se está analizando
+            if course_id not in maya_user.courses_ids.mapped('course_id').ids:
+              continue
+            else: # lo matriculamos
+              maya_user =  CronJobEnrolUsers.enrol_student(self, user[0], classroom[1], course_id) 
+
+            # Lo añado en lista de cancelaciones de oficio
+            subject_student = self.env['maya_core.subject_student_rel']\
+              .search([
+                ('subject_id', '=', classroom[1]),('student_id', '=', maya_user.id),('course_id', '=', course_id)
+                ], limit=1)
+            
+            # lo acabo de matricular luego debería haber un alumno
+            # si no lo hay es que posiblemente el alumno esté matriculado en maya de ese 
+            # módulo en otro ciclo.
+            # Eso puede pasar si el alumno está en dos o más ciclos y comparten el aula.
+            # NO es posible definir para ese módulo, en cual de los dos ciclos está matriculado
+            if not subject_student:
+              # busco sin tener en cuenta el curso
+              subject_student = self.env['maya_core.subject_student_rel']\
+                .search([
+                  ('subject_id', '=', classroom[1]),('student_id', '=', maya_user.id)
+                ], limit=1)
+              
+              error_code = 'A01'
+            
+            existing_cancellation = self.env['maya_students.cancellation'].search([
+              ('subject_student_rel_id', '=', subject_student.id)
+            ], limit=1)
+
+            if existing_cancellation:   # YA EXISTE: actualizo las fechas
+              existing_cancellation.write(
+                { 'query_date': fields.Datetime.now(),
+                  'lastaccess_date': user[1],
+                  'classroom_moodle_id': classroom[0],
+                  'error_codes': add_error_code(error_code or '', existing_cancellation.error_codes or '') 
+                  })
+              cancellation = existing_cancellation
+            else:
+              cancellation = self.env['maya_students.cancellation'].create([
+                { 'subject_student_rel_id': subject_student.id,
+                  'cancellation_type': 'OFC',
+                  'query_date': fields.Datetime.now(),
+                  'lastaccess_date': user[1],
+                  'situation': '1',
+                  'classroom_moodle_id': classroom[0] }])
+              
+            # si es nueva o sigue en riesgo lo añado al set
+            processed_cancellation_ids.add(cancellation.id)
+          except Exception as e:
+            _logger.error(f"Error procesando el aula moodle_id:{classroom[0]}. Usuario {maya_user.student_info}. {str(e)}")
+            errors.append(f'Error procesando el aula moodle_id:{classroom[0]}. Usuario {maya_user.student_info}. {str(e)} ')
+            self.env.cr.rollback() # Deshacemos cualquier cambio de esta usuiario en este aula
+            continue 
 
         # obtengo las obsoletas, gente que sí se ha conectado
         deprecated_cancellation_ids = existing_cancellation_ids - processed_cancellation_ids
@@ -174,9 +212,26 @@ class CronCheckAttendanceClassroom(models.TransientModel):
         self.env.cr.commit()  ## fuerzo el commit a la base de datos UNA VEZ por aula
 
       except Exception as e:
-        _logger.error(f"Error procesando el {classroom[1]}: {str(e)}")
+        _logger.error(f"Error procesando el aula moodle_id:{classroom[0]}: {str(e)}")
+        errors.append(f'Error procesando el aula moodle_id:{classroom[0]}')
         self.env.cr.rollback() # Deshacemos cualquier cambio de esta aula
         continue 
 
+    errors_filename = ''
+    if len (errors)>0:
+      date_str = datetime.now().strftime("%y%m%d%H%M")
+
+      errors_filename = f"/var/log/odoo/errores_check_attendance_{date_str}.txt" 
+      try:
+        with open(errors_filename, 'w', encoding='utf-8') as f:
+          for line in errors:
+            f.write(f"{line}\n")
         
+        # TODO lo utilizaremos en la notificacion via mail o telegram al adminstrador
+        errors_filename = f'\r{len(errors)} error(es). Más información en: ' + errors_filename
+
+      except IOError as e:
+        raise UserError(f"Error al escribir en el fichero: {str(e)}")
+
+  
               
