@@ -1,0 +1,18 @@
+<odoo>
+  <data>
+    <!-- ************************************************************************* -->
+    <!-- Reglas de registro. Condiciones que se deben dar para que algo ocurra. 
+         Se ejecutan registro por registro                                         -->
+    <!-- ************************************************************************* -->
+
+    <!-- Regla para ver solo las convalidaciones que le corresponden al convalidador -->
+    <record id="maya_students.cancellation_teacher_own_rule" model="ir.rule">
+      <field name="name">Acceso de los profesores solo a las anulaciones de sus módulos</field>
+      <field name="model_id" ref="model_maya_students_cancellation"/>
+      <field name="groups" eval="[(4, ref('maya_core.group_TEACH'))]"/>
+      <field name="domain_force">
+        [('teacher_employee_ids.user_id', '=', user.id)]
+      </field>
+    </record>
+  </data>
+</odoo>
