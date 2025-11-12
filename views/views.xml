@@ -189,7 +189,7 @@
     <menuitem name="Anulaciones" id="maya_students.menu_cancellation" parent="maya_students.menu_root"/>
     <menuitem name="Configuración" id="maya_students.menu_configuration" parent="maya_students.menu_root"/>
     
-    <!-- menú convalidaciones -->
+    <!-- menú anulaciones -->
     <menuitem name="Ordinarias" id="maya_students.menu_cancellation_ordinary" parent="maya_students.menu_cancellation"
               action="maya_students.action_cancellation_ordinary"/>
     <menuitem name="Oficio" id="maya_students.menu_cancellation_exofficio" parent="maya_students.menu_cancellation"

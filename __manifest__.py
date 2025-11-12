@@ -33,9 +33,11 @@
         'security/ir.model.access.csv',
         # vistas
         'views/views.xml',
+        'views/mail_templates/mail_risk1.xml',
+        'views/mail_templates/notification_cancellation_teacher_task.xml',
         # datos de modelos
+        'data/registered_notification_module.xml',
         'data/registered_cron_jobs.xml',
-        'data/mail_templates/mail_risk1.xml',
     ],
     # only loaded in demonstration mode
     'demo': [

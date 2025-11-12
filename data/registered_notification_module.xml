@@ -1,0 +1,17 @@
+<odoo>
+  <data noupdate="1">
+    <!-- Modulo notificador -->
+    <record id="maya_students.notification_provider" model="maya_core.notification_provider">
+      <field name="name">Maya | Students</field>
+      <field name="technical_name">maya_students</field>
+      <field name="is_enabled">True</field>
+    </record>
+
+    <!-- Grupos de notificación -->
+    <record id="maya_students.notification_group_exofficio_cancellations" model="maya_core.notification_group">
+      <field name="name">Anulaciones de oficio</field>
+      <field name="provider_id" ref="maya_students.notification_provider"/>
+      <field name="is_enabled">True</field>
+    </record>
+  </data>
+</odoo>

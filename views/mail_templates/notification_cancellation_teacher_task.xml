@@ -1,0 +1,68 @@
+<odoo>
+  <template id="maya_students.notification_cancellation_teacher_task">
+    
+    <t t-set="priority_map" t-value="{
+        '3': {'icon': '‼️', 'label': 'Crítica'},
+        '2': {'icon': '🔴', 'label': 'Alta'},
+        '1': {'icon': '🟡', 'label': 'Media'},
+        '0': {'icon': '🔵', 'label': 'Baja'}
+      }"/>
+
+    <t t-if="notifications">
+      <table style="width: 85%; margin-left: 10px; border-collapse: collapse; color: #333;">
+        <t t-foreach="notifications" t-as="n">
+          <tr style="border-bottom: 0px solid #eeeeee;">
+            <!-- defino un valor por defecto por si acaso, pero en principio siempre habrá uno asignado -->
+            <t t-set="p_info" t-value="priority_map.get(n.priority, {'icon': '⚪️', 'label': 'Indefinida'})"/>
+
+            <td style="padding: 12px 10px;">
+                    
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                
+                  <td style="padding: 6px 5px; width: 25px; text-align: left; font-size: 1em;">
+                      <!-- 
+                        Uso title para hacer compatible el tooltip con el email
+                        t-att-title crea el atributo 'title' dinámicamente.
+                      -->
+                      <span t-att-title="'Prioridad: %s' % p_info['label']">
+                          <t t-esc="p_info['icon']"/>
+                      </span>
+                      <span style="margin-left: 8px; font-weight: bold; font-size: 1.1em; vertical-align: middle;">
+                        <t t-esc="n.summary"/>
+                      </span>
+                  </td>
+                </tr>
+                <tr>
+                  <td colspan="2" style="padding-top: 8px;">
+                      <t t-esc="n.body"/>
+                  </td>
+                </tr>
+
+                <t t-if="n.link_objects">
+                  <tr>
+                    <td colspan="2" style="padding-top: 12px; border-top: 1px dashed #cccccc; margin-top: 12px;">
+                      <t t-foreach="n.link_objects" t-as="link_obj">
+                        <t t-set="link_number" t-value="link_obj_index + 1"/>
+                        
+                        <a t-attf-href="/web#id=12&amp;model=moldededede}"
+                            t-att-title="'Ir al Caso %s' % link_number"
+                            style="display: inline-block; background-color: #e9ecef; color: #495057; padding: 5px 10px; border-radius: 15px; text-decoration: none; margin: 2px 4px 2px 0; font-size: 0.9em;">
+                            Caso <t t-esc="link_number"/>
+                            <span style="margin-right: 3px; vertical-align: middle;">🔗</span>
+                        </a>
+                      </t>
+                    </td>
+                  </tr>
+                </t>
+
+              </table>
+            </td>
+          </tr>
+        </t>
+      </table>  
+    </t>
+
+    <small>Recuerda justificar a tiempo.</small>
+  </template>
+</odoo>
