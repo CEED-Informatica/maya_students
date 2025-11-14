@@ -49,7 +49,7 @@
                 <t t-foreach="n.link_objects" t-as="link_obj">
                   <t t-set="link_number" t-value="link_obj_index + 1"/>
                   
-                  <a t-attf-href="/web#id=12&amp;model=moldededede}"
+                  <a t-attf-href="{{link_obj}}"
                       t-att-title="'Ir al Caso %s' % link_number"
                       style="
                         display: inline-block; 

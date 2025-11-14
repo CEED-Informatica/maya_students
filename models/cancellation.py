@@ -6,6 +6,8 @@ import smtplib
 import socket   
 from odoo.tools.mail import email_normalize
 from datetime import date, datetime
+from collections import defaultdict
+import json
 import logging
 
 _logger = logging.getLogger(__name__)
@@ -34,9 +36,10 @@ class Cancellation(models.Model):
     ('3', 'Riesgo 1 - Notificado'),
     ('4', 'Riesgo 2 - Pendiente de llamada'),
     ('5', 'Riesgo 2 - Llamada realizada'),
-    ('6', 'Justificada'),
-    ('7', 'Iniciado proceso de anulación'),
-    ('8', 'Fin proceso de anulación'),
+    ('6', 'Riesgo 3 - Dirección'),
+    ('7', 'Justificada'),
+    ('8', 'Iniciado proceso de anulación'),
+    ('9', 'Módulo anulado de oficio'),
     ], string = 'Situación', default = '0',
     readonly = True)
 
@@ -415,7 +418,7 @@ class Cancellation(models.Model):
 
     for record in self:
       # Ausencias justificadas
-      if record.situation == '6':  
+      if record.situation == '7':  
       
         # si justificada y fecha vigente -> ignorar
         if record.justification_end_date and today <= record.justification_end_date:
@@ -431,13 +434,14 @@ class Cancellation(models.Model):
             continue
 
       # ya está notificada
-      if record.situation == '3':
+      elif record.situation == '3':
         if record.notification_date:
           days = (today - record.notification_date).days
           if days >= NUM_DIAS_AVISO:
             try:
               record.write({'situation': '4'})  # pasa a pendiente de llamada
               skipped.append((record.id, 'R1_notificada->R2_pendiente'))
+              continue
             except Exception as e:
               _logger.error(f"Error escribiendo situación '4' para {record.id}: {str(e)}")
               skipped.append((record.id, 'error_write_3->4'))
@@ -449,7 +453,7 @@ class Cancellation(models.Model):
           continue
 
       # Llegados a este punto, cualquier situation que no sea R1 sin notificar, no se procesa)
-      if record.situation != '1':
+      elif record.situation != '1':
         skipped.append((record.id, f'no_envio_sit_{record.situation}'))
         continue
         
@@ -490,7 +494,6 @@ class Cancellation(models.Model):
       for r in related_to_include:
         already_processed_in_memory.add(r.id)
 
-
       # genero el email_values con el template (no se envía aún)
       try:
         email_values = record._generate_mail_from_template(record, mail_server, include_all_cancellations=True)
@@ -512,6 +515,12 @@ class Cancellation(models.Model):
         except Exception as e2:
             _logger.error(f"Error revirtiendo situación tras fallo generación para {record.id}: {str(e2)}")
         continue
+
+
+    # Notificaciones para los profesores
+    # Anulaciones en 'Riesgo 2 Por notificar'
+    self.create_notification_items(skipped,self.env.ref('maya_students.notification_group_exofficio_cancellations').id)
+
 
 
     total_created = 0 # numero de notificaciones creadas (ojo! no enviadas, que por una notificación puede haber vbarios remitentes)
@@ -575,8 +584,6 @@ class Cancellation(models.Model):
           except Exception as e2:
             _logger.error(f"Error revirtiendo situación a '1' para la anuladción {main_id}: {str(e2)}")
 
-
-
     # info sobre generation_errors y skipped
     if generation_errors:
         _logger.warning(f"Errores generando correo: {generation_errors}")
@@ -597,71 +604,70 @@ class Cancellation(models.Model):
         }
     }
 
-
-
-  def send_notification_mail(self, include_all_subjects=False):
+  @api.model
+  def create_notification_items(self, skipped_list, ngroup_id):
     """
-    Fuerza el envio de un mail de notificación al alumno
+    A partir de la lista de elementos saltados en el envio de notificación a los alumnos
+    se crean las notificaciones para que los profesores hagan las llamadas
+
+    :skipped_list lista de tuplas (cancellation_id, tag_string)
+    :ngroup_id id del grupo de notificaciones (maya_core.notification_group)
     """
-    self.ensure_one()
 
-    # emails  TO, CC y REPLY
-    email_to = self.student_email_corp if email_normalize(self.student_email_corp) else ''
-    email_cc = ','.join([email for email in (self.student_email, self.student_email_support) if email_normalize(email)])
-    reply_to = self._get_teachers_reply_to_emails()
+    provider_id = self.env.ref('maya_students.notification_provider').id
 
-    # compruebo que hay un email al menos
-    if not self.student_email and not self.student_email_support and not self.student_email_corp:
-      raise UserError(
-          f"¡Acción no permitida! \n\n"
-          f"El estudiante {self.student_name} no tiene ningún email configurado."
-      )
+    # Filtro las anulaciones que están en situacn de R2 por llamar
+    cancellation_ids = [c_id for (c_id, tag) in skipped_list]
+    cancellations = self.env['maya_students.cancellation'].search([
+        ('id', 'in', cancellation_ids),
+        ('situation', '=', '4')
+    ])
 
-    # Busco el servidor de correo del centro
-    mail_alias = self.env['ir.config_parameter'].get_param('maya_core.alias_mail_center')
-    if not mail_alias:
-      print(f'\033[0;31m[ERROR]\033[0m No se ha definido el servidor de correo del centro')
+    if not cancellations:
       return
     
-    mail_server = self.env['ir.mail_server'].search([('name', '=', mail_alias)], limit=1)
-    if not mail_server:
-        raise UserError(f"No se encontró el servidor de correo o no ha sido configurado {mail_alias}.")
-    
-    email_from = '"CEED Notificaciones" <'+ mail_server.smtp_user + '>' 
+    base_url = self.env['ir.config_parameter'].get_param('web.base.url').rstrip('/') + '/'
 
-    email_values = {
-        'email_from': email_from,
-        'email_to': email_to,
-        'email_cc': email_cc,
-        'reply_to': reply_to,
-        # por si existieran contactos en res.partner, que no los busque
-        'recipient_ids': [], 
-    }
-    
-    template = self.env.ref('maya_students.email_template_cancellation_risk1')
+    # Las agrupo por profesor, ciclo y módulo
+    # (user.id, course.id, subject.id) → [cancellations...]
+    grouped = defaultdict(list)   
 
-    template.mail_server_id = mail_server.id
-    try:
-      template.send_mail(self.id, force_send=True, 
-                           email_values=email_values)
-      
-      self.write({
-        'situation': '3',  # -> 'Riesgo 1 - Notificado'
-        'notification_date': datetime.now().date()
+    for c in cancellations:
+      c.teacher_employee_ids # fuerzo el compute de los empleados
+      course = c.subject_student_rel_id.course_id
+      subject = c.subject_student_rel_id.subject_id
+
+      for teacher in c.teacher_employee_ids:
+        user = teacher.user_id
+        if not user:
+          continue
+
+        key = (user.id, course.id, subject.id) 
+        if c not in grouped[key]:
+          grouped[key].append(c)
+
+    # Creo las notificaciones
+    for key, cancels in grouped.items():
+      course = self.env['maya_core.course'].browse(key[1]) if key[1] else None
+      subject = self.env['maya_core.subject'].browse(key[2]) if key[2] else None
+      user_email = self.env['res.users'].browse(key[0]).email
+
+      course_abbr = course.abbr if course and course.exists() and course.abbr else ''
+      subject_name = subject.name if subject and subject.exists() and subject.name else ''
+
+      summary = f'[{course_abbr}] - {subject_name}'
+      to = 'llamadas pendientes a estudiantes' if len(cancels) > 1 else 'llamada pendiente a un estudiante'
+      body = f'Tienes {len(cancels)} {to} en riesgo 2 de abandono (R2)'
+
+      urls = [ f'{base_url}/web?reload=true#id={c.id}&menu_id=289&model=maya_students.cancellation&view_type=form'
+               for c in cancels]
+
+      self.env['maya_core.notification_item'].create({
+          'provider_id': provider_id,
+          'user_id': key[0],
+          'ngroup_id': ngroup_id,
+          "priority": "3",
+          "summary": summary,
+          "body": body, 
+          "link_objects": urls
       })
-    
-    except UserError as e:
-      # error de Odoo (plantilla mal configurada, faltan datos...)
-      _logger.warning(f"Error al enviar email a {self.student_name}: {str(e)}")
-      raise e
-
-    except (smtplib.SMTPException, socket.error) as e:
-      # error de red o del Servidor SMTP (no hay conexión, auth fallida...)
-      _logger.error(f"Error de Red/SMTP al enviar email a {self.student_name}: {str(e)}")
-      raise UserError(f"No se pudo contactar con el servidor de correo. Error: {str(e)}")
-
-    except Exception as e:
-      # cualquier otro error inesperado
-      _logger.error(f"Error inesperado al enviar email a {self.student_name}: {str(e)}")
-      raise UserError(f"Ocurrió un error inesperado al enviar el correo: {str(e)}")
-
