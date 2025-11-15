@@ -10,6 +10,8 @@ from collections import defaultdict
 import json
 import logging
 
+from ...maya_core.support.helper import get_mail_server
+
 _logger = logging.getLogger(__name__)
 
 ERROR_MAP = {
@@ -230,19 +232,6 @@ class Cancellation(models.Model):
   #################################
   #### ENVIO DE NOTIFICACIONES #### 
   #################################
-  def _get_mail_server(self):
-    """
-    Busca y devuelve el mail.server del centro configurado (o lanza UserError).
-    """
-    mail_alias = self.env['ir.config_parameter'].get_param('maya_core.alias_mail_center')
-    if not mail_alias:
-        raise UserError("No se ha definido el servidor de correo del centro (param maya_core.alias_mail_center).")
-    mail_server = self.env['ir.mail_server'].search([('name', '=', mail_alias)], limit=1)
-    if not mail_server:
-        raise UserError(f"No se encontró el servidor de correo '{mail_alias}' en ir.mail_server.")
-    
-    return mail_server
-  
   def _get_teachers_reply_to_emails(self, include_all_cancellations = False):
     """
     Busca todos los profesores asociados al módulo y ciclo
@@ -291,7 +280,7 @@ class Cancellation(models.Model):
     template = self.env.ref('maya_students.email_template_cancellation_risk1')
   
     # emails  TO, CC y REPLY
-    email_from = f'"CEED Notificaciones" <{mail_server.smtp_user}>'
+    email_from = f'"Notificaciones CEED" <{mail_server.smtp_user}>'
     email_to = record.student_email_corp if email_normalize(record.student_email_corp) else ''
     email_cc = ','.join([email for email in (record.student_email, record.student_email_support) if email_normalize(email)])
     reply_to = record._get_teachers_reply_to_emails(include_all_cancellations)
@@ -356,7 +345,7 @@ class Cancellation(models.Model):
       )
 
     email_data = self._generate_mail_from_template(self, 
-                                      self._get_mail_server(), 
+                                      get_mail_server(self, 'centro'), 
                                       include_all_cancellations = False)
 
     try:
@@ -413,7 +402,7 @@ class Cancellation(models.Model):
     mails_to_create = []   # lista de dicts con email_values
     packages = []          # lista de dicts {'main_id': int, 'related_ids': [int,...]} para cambiar la situation si el envio ha sido correcto
     
-    mail_server = self._get_mail_server()
+    mail_server = get_mail_server(self, 'centro')
     today = fields.Date.today()
 
     for record in self:
