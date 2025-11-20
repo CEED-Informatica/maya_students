@@ -24,9 +24,13 @@
     'price': 0,
 
     # any module necessary for this one to work correctly
-     # any module necessary for this one to work correctly
     'depends': ['base', 'mail', 'maya_core'],
-
+    
+    'assets': {
+        'web.assets_backend': [
+            'maya_core/static/src/js/tab_switcher.js',
+        ],
+    },
     # always loaded
     'data': [
         # seguridad
@@ -34,7 +38,9 @@
         # vistas
         'views/views.xml',
         'views/mail_templates/mail_risk1.xml',
+        'views/mail_templates/mail_risk2.xml',
         'views/mail_templates/notification_cancellation_teacher_task.xml',
+        #'views/assets.xml',
         # datos de modelos
         'data/registered_notification_module.xml',
         'data/registered_cron_jobs.xml',

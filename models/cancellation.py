@@ -45,7 +45,10 @@ class Cancellation(models.Model):
     ], string = 'Situación', default = '0',
     readonly = True)
 
-  notification_date = fields.Date(string = 'Fecha de notificación R1', 
+  notification_date = fields.Date(string = 'Fecha de notificación', 
+                                help = 'Fecha de notificación de alumno en riesgo 1 por mail')
+  
+  notification_date_r2 = fields.Date(string = 'Fecha de notificación', 
                                 help = 'Fecha de notificación de alumno en riesgo 1 por mail')
 
   query_date = fields.Datetime(string = 'Fecha de la consulta', 
@@ -66,6 +69,9 @@ class Cancellation(models.Model):
   comments = fields.Text(string = 'Comentarios',
                         help = 'Información relativa a la razón de la justificación')
 
+  comments_r2 = fields.Text(string = 'Comentarios',
+                        help = 'Información relativa a la notificación de R2')
+
   # Relación 1:1 con subject_student_rel
   subject_student_rel_id = fields.Many2one(
     'maya_core.subject_student_rel',
@@ -78,6 +84,8 @@ class Cancellation(models.Model):
   student_email = fields.Char(string = 'Email', related = 'subject_student_rel_id.student_id.email')
   student_email_support = fields.Char(string = 'Email de apoyo', related = 'subject_student_rel_id.student_id.email_support')
   student_email_corp = fields.Char(string = 'Email corporativo', related = 'subject_student_rel_id.student_id.email_coorp')
+  student_telephone1 = fields.Char(string = 'Teléfono 1', related = 'subject_student_rel_id.student_id.telephone1')
+  student_telephone2 = fields.Char(string = 'Teléfono 2', related = 'subject_student_rel_id.student_id.telephone2')
   subject_name = fields.Char(string = 'Módulo', related = 'subject_student_rel_id.subject_id.name', store = True)
   subject_course = fields.Char(string = 'Ciclo', related = 'subject_student_rel_id.course_id.abbr', store = True)
 
@@ -268,7 +276,7 @@ class Cancellation(models.Model):
 
     return ','.join(unique)
   
-  def _generate_mail_from_template(self, record, mail_server, include_all_cancellations = False):
+  def _generate_mail_from_template(self, record, risk, mail_server, include_all_cancellations = False):
     """
     Genera (crea) un registro mail.mail a partir de la plantilla para el main_record.
     No hace cambios de estado aquí. Devuelve la mail.mail creada.
@@ -277,7 +285,10 @@ class Cancellation(models.Model):
     """
     self.ensure_one() 
 
-    template = self.env.ref('maya_students.email_template_cancellation_risk1')
+    if risk == 'r1':
+      template = self.env.ref('maya_students.email_template_cancellation_risk1')
+    else:
+      template = self.env.ref('maya_students.email_template_cancellation_risk2')
   
     # emails  TO, CC y REPLY
     email_from = f'"Notificaciones CEED" <{mail_server.smtp_user}>'
@@ -330,9 +341,25 @@ class Cancellation(models.Model):
 
     return email_data
   
-  def send_notification_mail_subject(self):
+  def send_r1_notification_mail_subject(self):
     """
-    Fuerza el envio de un mail de notificación al alumno por una anulación
+    Fuerza el envío de un mail de notificación al alumno por una anulación en riesgo 1 
+    """
+    self.send_notification_mail_subject('r1')
+
+  def send_r2_notification_mail_subject(self):
+    """
+    Fuerza el envío de un mail de notificación al alumno por una anulación en riesgo 2 
+    """
+    self.send_notification_mail_subject('r2')
+
+    ## TODO completar la fecha y las observaciones del riesgo 2
+
+
+
+  def send_notification_mail_subject(self, risk):
+    """
+    Fuerza el envío de un mail de notificación al alumno por una anulación
     """
     self.ensure_one()
 
@@ -344,7 +371,7 @@ class Cancellation(models.Model):
           f"El estudiante {self.student_name} no tiene ningún email configurado."
       )
 
-    email_data = self._generate_mail_from_template(self, 
+    email_data = self._generate_mail_from_template(self, risk,
                                       get_mail_server(self, 'centro'), 
                                       include_all_cancellations = False)
 
@@ -660,3 +687,8 @@ class Cancellation(models.Model):
           "body": body, 
           "link_objects": urls
       })
+
+    
+  def action_download_cancellation_r3_file(self):
+    print("bahjo cosas")
+    return

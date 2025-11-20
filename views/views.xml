@@ -36,15 +36,10 @@
           <xpath expr="//style" position="after">
             <link rel="stylesheet" href="/maya_core/static/css/maya_core_styles.css"/>
           </xpath> 
-          <group col='3'>
+          <group col='4'>
             <group>
               <field name="student_name" />
               <field name="student_nia" /> 
-            </group>
-            <group>
-              <field name="student_email" />
-              <field name="student_email_support" /> 
-              <field name="student_email_corp" /> 
             </group>
             <group>
               <field name="subject_name" /> 
@@ -55,12 +50,15 @@
                     decoration-success="situation == '6'"
                     decoration-primary="situation in ['1', '8']"
                     />
-              <button name="send_notification_mail_subject"
-                      type="object"
-                      string="Forzar envio mail"
-                      icon="fa-envelope"
-                      class="btn-secondary text-nowrap"
-                      confirm="Este acción enviará una notificación por correo electrónico al estudiante alertandole de su riesgo actual SÓLO por este módulo (no se tienen en cuenta otras posibles anulaciones relacionadas). ¿Deseas continuar?"/>
+            </group>
+            <group>
+              <field name="student_email" />
+              <field name="student_email_support" /> 
+              <field name="student_email_corp" /> 
+            </group>
+             <group>
+              <field name="student_telephone1"/>
+              <field name="student_telephone2"/>
             </group>
           </group>
           <separator string="Información" style="padding-bottom:15px"/>
@@ -78,7 +76,63 @@
             <field name="error_descriptions" class="info" nolabel="1" readonly="1" colspan="2"/>
           </group>
           <notebook>
-            <page string='Justificación'>
+            <page string='Notificaciones' name="tab1">
+              <group col="2">
+                <separator string="Riesgo 1" style="padding-bottom:15px"/>
+                <group>
+                  <field name="notification_date" readonly="1"/>
+                </group>
+                <group>
+                <button name="send_r1_notification_mail_subject"
+                        type="object"
+                        string="Forzar envio mail"
+                        icon="fa-envelope"
+                        class="btn-secondary text-nowrap"
+                        confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertandole de que está en riesgo 1 SÓLO por este módulo (no se tienen en cuenta otras posibles anulaciones relacionadas). ¿Deseas continuar?"/>
+                </group>
+              </group>
+              <group col="2">
+                <separator string="Riesgo 2" style="padding-bottom:15px"/>
+                <group>
+                  <field name="notification_date_r2" readonly="1"/>
+                </group>
+                <group>
+                  <div class="d-flex gap-4">
+                    <button name="send_r2_notification_mail_subject"
+                          type="object"
+                          string="Notificar R2 por mail"
+                          icon="fa-envelope"
+                          class="btn-secondary text-nowrap"
+                          confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
+              
+                    <button name="send_r2_notification_mail_subject"
+                          type="object"
+                          string="Abandona el módulo"
+                          icon="fa-ban"
+                          class="btn-danger text-nowrap"
+                          confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
+                  
+                    <a class="btn btn-success o_internal_tab_switcher text-nowrap"
+                       data-target-tab-name="tab2"
+                       role="button"
+                       href="#">
+                       <i class="fa fa-calendar-check-o me-1"/> Justificación
+                    </a>
+
+                    <button name="send_r2_notification_mail_subject"
+                          type="object"
+                          string="Quiere continuar"
+                          icon="fa-arrow-right"
+                          class="btn-warning text-nowrap"
+                          confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
+                  </div>
+                </group>
+              </group>
+              <group col="2">
+                <field name="comments_r2" />
+              </group>
+            </page>
+            <page string='Justificación' name="tab2">
               <group col="2">
                 <group>
                   <field name="justification_end_date" />
@@ -104,11 +158,7 @@
                 <field name="comments" />
               </group>
             </page>            
-            <page string='Notificaciones'>
-              <group>
-                <field name="notification_date" readonly="1"/>
-              </group>
-            </page>
+            
             <page string='Otras anulaciones'>
               <field name="related_cancellations_ids" readonly="1">
                 <tree>

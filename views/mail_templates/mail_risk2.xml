@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <data>
+    <record id="email_template_cancellation_risk2" model="mail.template">
+      <field name="name">Plantilla mail a estudiantes en riesgo 2 de baja de oficio</field>
+      <field name="model_id" ref="model_maya_students_cancellation"/>
+      <field name="subject">[CEEDCV] URGENTE. Anulación de matrícula de oficio por falta de asistencia</field>
+      <field name="auto_delete" eval="True"/>
+      <field name="body_html"><![CDATA[
+<div style="margin: 0px; padding: 0px;">
+  <style>
+    /* Utilizo pixels como unidad ya que es más seguro pensando en que es un mail */
+    /* El lector de correos puede generar div que no puedo controlar */
+
+    /* Estilos para las tarjetas de módulo */
+    .module-card {
+      border-collapse: collapse;
+      width: 80%; 
+      margin-top: 15px;
+      margin-bottom: 15px;
+      margin-left: auto; 
+      margin-right: auto; 
+      border: 1px solid #ccc;
+      font-family: Arial, sans-serif;
+      font-size: 13px;
+      -webkit-box-shadow: 2px 2px 5px 0px rgba(0,0,0,0.1);
+      box-shadow: 2px 2px 5px 0px rgba(0,0,0,0.1);
+    }
+    .card-header {
+      background-color: #f2f2f2;
+      padding: 10px 12px;
+      font-weight: bold;
+      font-size: 14px;
+      border-bottom: 1px solid #ccc;
+      color: #333;
+    }
+    .card-body {
+      padding: 12px;
+      line-height: 1.6;
+    }
+    .card-body a {
+      color: #007bff;
+      text-decoration: none;
+    }
+    .card-body a:hover {
+      text-decoration: underline;
+    }
+    .card-body p {
+      margin: 0px 0px 8px 0px;
+      padding: 0px;
+    }
+    .card-body p:last-child {
+      margin-bottom: 0px;
+    }
+  </style>
+
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    Estimado/a estudiante,  
+    <br/><br/>
+
+    <t t-out="object.subject_student_rel_id.student_id.student_info"/><br/>
+    <t t-out="object.subject_student_rel_id.course_id.abbr"/><br/>
+    <t t-out="object.subject_student_rel_id.student_id.nia"/><br/><br/>
+  </p>
+
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    De acuerdo con la RESOLUCIÓN de 17 de julio de 2025, de la Secretaría Autonómica de Educación,  
+    por la que se dictan instrucciones sobre ordenación académica y de organización de los centros  
+    que impartan los grados D y E de Formación Profesional durante el curso 2025-2026 en
+    la Comunidad Valenciana, le informamos que se ha detectado una inactividad en su participación
+    en el curso durante los últimos 8 días lectivos.  
+  </p>
+
+  <!-- lo utilizo como espaciador para poder gestionar mejor el alto de línea -->
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    RRRRRRRIESGOOOOOO  2
+  </p>
+
+  <table class="module-card" role="presentation" style="border-collapse: collapse; width: 80%; margin-top: 15px; margin-bottom: 15px; margin-left: auto; margin-right: auto; border: 1px solid #ccc; font-size: 13px;">
+    <tr>
+      <td class="card-header" style="background-color: #f2f2f2; padding: 10px 12px; font-weight: bold; font-size: 14px; border-bottom: 1px solid #ccc;">
+        [<t t-out="object.subject_student_rel_id.subject_id.code or ''"/>] - <t t-out="object.subject_student_rel_id.subject_id.name or ''"/> 
+      </td>
+    </tr>
+    <tr>
+      <td class="card-body" style="padding: 12px; line-height: 1.6;">
+        <p style="margin: 0px 0px 8px 0px; padding: 0px;">
+          <strong>Última Conexión:</strong>
+          <t t-out="object.lastaccess_date_text or '---'"/>
+        </p>
+        <p style="margin: 0px 0px 8px 0px; padding: 0px;">
+          <strong>Aula Virtual:</strong>
+          <a t-att-href="object.classroom_link or '#'" style="color: #007bff; text-decoration: none;">Acceder al Aula</a>
+        </p>
+
+        <table role="presentation" style="border-collapse: collapse; width: 100%; font-size: 13px; line-height: 1.6;">
+          <tr>
+            <td style="width: 1%; white-space: nowrap; vertical-align: top; padding: 0; padding-right: 3px; margin: 0; font-weight: bold;">
+              Profesorado:
+            </td>
+            <td style="vertical-align: top; padding: 0; margin: 0;">
+              <t t-if="not object.teacher_employee_ids">
+                (No asignado)
+              </t>
+              <t t-else>
+                <t t-foreach="object.teacher_employee_ids" t-as="teacher">
+                  <a t-att-href="'mailto:' + (teacher.work_email or '')" 
+                    style="color: #007bff; text-decoration: none; display: block; margin-bottom: 3px;">
+                    <t t-out="teacher.surname or ''"/>, <t t-out="teacher.name or ''"/>
+                  </a>
+                </t>
+              </t>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    En caso de no registrar actividad en los próximos 2 días lectivos, procederemos a iniciar el proceso de baja de oficio, según la normativa vigente.  
+  </p>
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    Si existen circunstancias especiales que hayan impedido su conexión, le rogamos que presente las  
+    alegaciones correspondientes en este plazo de 2 días, contactando directamente con el profesorado del módulo.
+    <strong>No llame al centro</strong>.
+  </p>
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    Queremos reiterar nuestro compromiso con su formación y apoyarle en su proceso educativo. Si considera que este correo  
+    puede deberse a un error, no dude en comunicarse con el profesorado del módulo.  
+  </p>
+  <div style="height: 10px; line-height: 10px; font-size: 10px;">&nbsp;</div>
+  <p style="margin: 0px; padding: 0px; font-size: 14px;">
+    Atentamente,  
+  </p>
+  <br/>
+</div>
+]]></field>
+    </record>
+
+  </data>
+</odoo>
