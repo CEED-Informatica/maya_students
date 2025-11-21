@@ -105,6 +105,7 @@
                             string="Notificar R2 por mail"
                             icon="fa-envelope"
                             class="btn-secondary text-nowrap"
+                            invisible="situation in ['6','8','9']"
                             confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
                 
                       <button name="cancellation_to_r3"
@@ -128,6 +129,7 @@
                             string="Quiere continuar"
                             icon="fa-arrow-right"
                             class="btn-warning text-nowrap"
+                            invisible="situation in ['6','8','9']"
                             confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
                     </div>
                   </group>
@@ -137,7 +139,7 @@
                 </group>
               </div>
             </page>
-            <page string='Justificación' name="tab2">
+            <page string='Justificación' name="tab2" invisible="situation in ['6','8','9']">
               <group col="2">
                 <group>
                   <field name="justification_end_date" />
