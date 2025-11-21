@@ -46,9 +46,10 @@
               <field name="subject_course" />
               <field name="situation" widget="badge"
                     decoration-warning="situation in ['4', '5']"
-                    decoration-danger="situation in ['7', '8']"
-                    decoration-success="situation == '6'"
-                    decoration-primary="situation in ['1', '8']"
+                    decoration-danger="situation in ['6', '8']"
+                    decoration-success="situation == '7'"
+                    decoration-info="situation in ['9']"
+                    decoration-primaru="situation in ['1', '2', '3']"
                     />
             </group>
             <group>
@@ -91,46 +92,50 @@
                         confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertandole de que está en riesgo 1 SÓLO por este módulo (no se tienen en cuenta otras posibles anulaciones relacionadas). ¿Deseas continuar?"/>
                 </group>
               </group>
-              <group col="2">
-                <separator string="Riesgo 2" style="padding-bottom:15px"/>
-                <group>
-                  <field name="notification_date_r2" readonly="1"/>
-                </group>
-                <group>
-                  <div class="d-flex gap-4">
-                    <button name="send_r2_notification_mail_subject"
-                          type="object"
-                          string="Notificar R2 por mail"
-                          icon="fa-envelope"
-                          class="btn-secondary text-nowrap"
-                          confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
-              
-                    <button name="send_r2_notification_mail_subject"
-                          type="object"
-                          string="Abandona el módulo"
-                          icon="fa-ban"
-                          class="btn-danger text-nowrap"
-                          confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
-                  
-                    <a class="btn btn-success o_internal_tab_switcher text-nowrap"
-                       data-target-tab-name="tab2"
-                       role="button"
-                       href="#">
-                       <i class="fa fa-calendar-check-o me-1"/> Justificación
-                    </a>
+              <div invisible="situation in ['0', '1', '2', '3']">
+                <group col="2">
+                  <separator string="Riesgo 2" style="padding-bottom:15px"/>
+                  <group>
+                    <field name="notification_date_r2" readonly="1"/>
+                  </group>
+                  <group>
+                    <div class="d-flex gap-4">
+                      <button name="send_r2_notification_mail_subject"
+                            type="object"
+                            string="Notificar R2 por mail"
+                            icon="fa-envelope"
+                            class="btn-secondary text-nowrap"
+                            confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
+                
+                      <button name="cancellation_to_r3"
+                            type="object"
+                            string="Abandona el módulo"
+                            icon="fa-ban"
+                            class="btn-danger text-nowrap"
+                            invisible="situation!='4'"
+                            confirm="Esta acción pasará de manera automática al alumno a situación de Riesgo 3 - Dirección en este módulo. ¿Deseas continuar?"/>
+                    
+                      <a class="btn btn-success o_internal_tab_switcher text-nowrap"
+                        data-target-tab-name="tab2"
+                        role="button"
+                        href="#"
+                        invisible="situation in ['6','8','9']">
+                        <i class="fa fa-calendar-check-o me-1"/> Justificación
+                      </a>
 
-                    <button name="send_r2_notification_mail_subject"
-                          type="object"
-                          string="Quiere continuar"
-                          icon="fa-arrow-right"
-                          class="btn-warning text-nowrap"
-                          confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
-                  </div>
+                      <button name="send_r2_notification_mail_subject"
+                            type="object"
+                            string="Quiere continuar"
+                            icon="fa-arrow-right"
+                            class="btn-warning text-nowrap"
+                            confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
+                    </div>
+                  </group>
                 </group>
-              </group>
-              <group col="2">
-                <field name="comments_r2" />
-              </group>
+                <group col="2">
+                  <field name="comments_r2" readonly="1"/>
+                </group>
+              </div>
             </page>
             <page string='Justificación' name="tab2">
               <group col="2">

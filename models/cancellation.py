@@ -688,6 +688,21 @@ class Cancellation(models.Model):
           "link_objects": urls
       })
 
+  def cancellation_to_r3(self):
+    """
+    Pasa la anulación de oficio a R3 - Dirección
+    """
+
+    current_datetime = datetime.now()
+    current_day = current_datetime.strftime('%d-%m-%Y %H:%M:%S')
+
+    current_employee = self.env.user.maya_employee_id
+
+    info = f'({current_day}) Ha notificado la decisión de anular el módulo. [{current_employee.display_name or "--"} / Ext: {current_employee.phone_extension or "--"}]' 
+
+    self.notification_date_r2 = current_datetime.date()
+    self.comments_r2 = ((self.comments_r2 or '') + '\n' + info).lstrip('\n')
+    self.situation = '6'
     
   def action_download_cancellation_r3_file(self):
     print("bahjo cosas")
