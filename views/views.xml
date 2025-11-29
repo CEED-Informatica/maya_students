@@ -89,6 +89,7 @@
                         string="Forzar envio mail"
                         icon="fa-envelope"
                         class="btn-secondary text-nowrap"
+                        invisible="situation in ['4','5','6','7','8','9']"
                         confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertandole de que está en riesgo 1 SÓLO por este módulo (no se tienen en cuenta otras posibles anulaciones relacionadas). ¿Deseas continuar?"/>
                 </group>
               </group>
@@ -105,7 +106,7 @@
                             string="Notificar R2 por mail"
                             icon="fa-envelope"
                             class="btn-secondary text-nowrap"
-                            invisible="situation in ['6','8','9']"
+                            invisible="situation in ['5','6','7','8','9']"
                             confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
                 
                       <button name="cancellation_to_r3"
@@ -113,24 +114,24 @@
                             string="Abandona el módulo"
                             icon="fa-ban"
                             class="btn-danger text-nowrap"
-                            invisible="situation!='4'"
+                            invisible="situation in ['5','6','8','9']"
                             confirm="Esta acción pasará de manera automática al alumno a situación de Riesgo 3 - Dirección en este módulo. ¿Deseas continuar?"/>
                     
                       <a class="btn btn-success o_internal_tab_switcher text-nowrap"
                         data-target-tab-name="tab2"
                         role="button"
                         href="#"
-                        invisible="situation in ['6','8','9']">
+                        invisible="situation in ['6','7','8','9']">
                         <i class="fa fa-calendar-check-o me-1"/> Justificación
                       </a>
 
-                      <button name="send_r2_notification_mail_subject"
+                      <button name="cancellation_to_r2d"
                             type="object"
                             string="Quiere continuar"
                             icon="fa-arrow-right"
                             class="btn-warning text-nowrap"
-                            invisible="situation in ['6','8','9']"
-                            confirm="Esta acción enviará una notificación por correo electrónico al estudiante alertándole de que está en riesgo 2 únicamente por este módulo. Debe utilizarse sólo en el caso de que se haya intentado localizar al alumno/a por teléfono y no se haya conseguido. ¿Deseas continuar?"/>
+                            invisible="situation in ['5','6','7','8','9']"
+                            confirm="Esta acción deja que el proceo de baja siga adelante a la espera de que el alumno se conecte al aula virtual del módulo. ¿Deseas continuar?"/>
                     </div>
                   </group>
                 </group>
@@ -142,27 +143,14 @@
             <page string='Justificación' name="tab2" invisible="situation in ['6','8','9']">
               <group col="2">
                 <group>
-                  <field name="justification_end_date" />
+                  <field name="justification_end_date" readonly="justification_date_to_june_trigger or situation == '7'"  force_save="1"/>
                 </group>
-                <group>
-                  <div class="d-flex gap-4">
-                    <button name="set_justification_to_june"
-                                    type="object"
-                                    icon="fa-calendar-check-o"
-                                    string="Justificar hasta final de curso"
-                                    class="btn-secondary text-nowrap"/>
-                    <button name="clear_justification_date"
-                                  type="object"
-                                  string="Borrar justificación"
-                                  icon="fa-trash"
-                                  class="btn-secondary text-nowrap"
-                                  style="width: 100%"
-                                  invisible="justification_end_date==False"/>
-                  </div>
+                <group>  
+                  <field name="justification_date_to_june_trigger" readonly="situation== '7'"/>
                 </group>
               </group>
               <group>
-                <field name="comments" />
+                <field name="comments" readonly="situation== '7'" />
               </group>
             </page>            
             

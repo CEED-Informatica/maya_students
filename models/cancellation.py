@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from odoo import api, models, fields
-from odoo.exceptions import UserError
+from odoo.exceptions import UserError, ValidationError
 import smtplib  
 import socket   
 from odoo.tools.mail import email_normalize
@@ -11,6 +11,7 @@ import json
 import logging
 
 from ...maya_core.support.helper import get_mail_server
+from ...maya_core.support.maya_logger.exceptions import MayaException
 
 _logger = logging.getLogger(__name__)
 
@@ -66,10 +67,10 @@ class Cancellation(models.Model):
   justification_end_date = fields.Date(string = 'Justificado hasta', 
                                 help = 'Fecha fin de la ajustificación')
 
-  comments = fields.Text(string = 'Comentarios',
+  comments = fields.Text(string = 'Observaciones',
                         help = 'Información relativa a la razón de la justificación')
 
-  comments_r2 = fields.Text(string = 'Comentarios',
+  comments_r2 = fields.Text(string = 'Registro',
                         help = 'Información relativa a la notificación de R2')
 
   # Relación 1:1 con subject_student_rel
@@ -115,6 +116,18 @@ class Cancellation(models.Model):
     store=False
   )
 
+  ## campos no almacenadoa
+  # se utiliza para indicar que la justificación es hasta final del curso
+  justification_date_to_june_trigger = fields.Boolean(
+    string="Justificar hasta final de curso", 
+    compute="_compute_justification_trigger",
+    inverse="_inverse_justification_trigger",
+    default = False,
+    store = False 
+  )
+
+  date_end_current_course = fields.Date(compute='_compute_date_end_current_course')  
+
   _sql_constraints = [(
     'unique_subject_student_rel_id',
     'unique(subject_student_rel_id)',
@@ -150,6 +163,7 @@ class Cancellation(models.Model):
       else:
         record.related_cancellations_ids = False
 
+
   @api.depends('lastaccess_date', 'query_date')
   def _compute_lastaccess_date_text(self):
     """
@@ -180,6 +194,7 @@ class Cancellation(models.Model):
 
         record.lastaccess_date_text = f"{fecha_str} ({n_dias_str} dias desde la última consulta)"
 
+
   @api.depends('classroom_moodle_id')
   def _compute_link_classroom(self):
     """
@@ -192,24 +207,97 @@ class Cancellation(models.Model):
       else:
         record.classroom_link = ''
 
+
   def clear_justification_date(self):
     """
     Quita la fecha de la justificación
     """
-    self.justification_end_date = False
+    self.justification_end_date= False
 
-  def set_justification_to_june(self):
-    """
-    Asigna la fecha de la justificación a final de curso
-    """
-    today = fields.Date.today()
-    current_year = today.year
 
-    if today <= date(current_year, 8, 31):
-      # 30 de Junio de ESTE año
-      self.justification_end_date = date(current_year, 6, 30)
-    else: # después del 31 de agosto, el 3o de junio del año que viene
-      self.justification_end_date = date(current_year + 1, 6, 30)
+  def _compute_date_end_current_course(self):
+    """
+    Calcula la fecha de final de curso
+    Realmente actua como una variable interna de la clase (que no el modelo), para poder
+    centralizar el cálculo
+    """
+    current_sy = (self.env['maya_core.school_year'].search([('state', '=', 1)])) # curso escolar actual  
+
+    if len(current_sy) == 0:
+      raise MayaException(
+          _logger, 
+          'No se ha definido un curso actual',
+          50, # critical
+          comments = '''Es posible que no se haya marcado como actual ningún curso escolar''')
+    else:
+      self.date_end_current_course = date(current_sy[0].date_init.year + 1,6,30) 
+
+
+  def update_justification_end_date(self):
+    """
+    Actualiza la fecha de fin de justificación en función del checkbox justification_date_to_june_trigger
+    """
+    if self.justification_date_to_june_trigger:
+      today = fields.Date.today()
+      current_year = today.year
+
+      if today <= date(current_year, 8, 31):
+        # 30 de Junio de ESTE año
+        self.justification_end_date = date(current_year, 6, 30)
+      else: # después del 31 de agosto, el 3o de junio del año que viene
+        self.justification_end_date = date(current_year + 1, 6, 30)
+    else: # desactivo la fecha
+      self.justification_end_date = False
+
+
+  @api.onchange('justification_date_to_june_trigger')
+  def _onchange_justification_date_to_june_trigger(self):
+    self.update_justification_end_date()
+
+
+  def _inverse_justification_trigger(self):
+    # Calcula la fecha cuando se activa el disparador. 
+    # Hay que crearla, aunque sea  vacia ya que sino el ercurso queda en readonly
+    return
+
+
+  @api.depends('justification_end_date')
+  def _compute_justification_trigger(self):
+    self.ensure_one()
+
+    if self.justification_end_date == False or self.justification_end_date < self.date_end_current_course:
+      self.justification_date_to_june_trigger = False
+    else:
+      self.justification_date_to_june_trigger = True
+  
+
+  @api.constrains('justification_end_date', 'comments')
+  def _check_justification_comments(self):
+    """
+    Comprueba que una justificación siempre tiene que tener un comentario
+    """ 
+    self.ensure_one()
+
+    # si hay fecha de justificacion => tiene que haber comentarios
+    if self.justification_end_date and not self.comments:
+        raise ValidationError(
+            'Se ha indicado fecha de fin de justificación pero no se han completado los comentarios.'
+        )
+
+  def write(self, vals):
+    """
+    Actualiza en la base de datos un registro
+    """    
+    if 'justification_end_date' in vals and vals['justification_end_date']:
+      vals['comments_r2'] = ((self.comments_r2 or '') + '\n' + self.update_after_r2('JUS')).lstrip('\n')
+      vals['situation'] = '7'  ## justicada 
+
+    if not self.justification_end_date and 'justification_end_date' not in vals or \
+      'justification_end_date' in vals and not vals['justification_end_date']:
+      vals['comments'] = ''  
+
+    return super(Cancellation, self).write(vals)
+
 
   @api.depends('subject_student_rel_id.subject_id', 'subject_student_rel_id.course_id')
   def _compute_teacher_employees(self):
@@ -276,6 +364,7 @@ class Cancellation(models.Model):
 
     return ','.join(unique)
   
+
   def _generate_mail_from_template(self, record, risk, mail_server, include_all_cancellations = False):
     """
     Genera (crea) un registro mail.mail a partir de la plantilla para el main_record.
@@ -341,11 +430,13 @@ class Cancellation(models.Model):
 
     return email_data
   
+
   def send_r1_notification_mail_subject(self):
     """
     Fuerza el envío de un mail de notificación al alumno por una anulación en riesgo 1 
     """
     self.send_notification_mail_subject('r1')
+
 
   def send_r2_notification_mail_subject(self):
     """
@@ -353,8 +444,7 @@ class Cancellation(models.Model):
     """
     self.send_notification_mail_subject('r2')
 
-    ## TODO completar la fecha y las observaciones del riesgo 2
-
+    self.update_after_r2('R2M')
 
 
   def send_notification_mail_subject(self, risk):
@@ -412,6 +502,7 @@ class Cancellation(models.Model):
       # cualquier otro error inesperado
       _logger.error(f"Error inesperado al enviar email a {self.student_name}: {str(e)}")
       raise UserError(f"Ocurrió un error inesperado al enviar el correo: {str(e)}")
+
 
   def send_notification_mail_subject_agruped(self):
     """
@@ -620,6 +711,7 @@ class Cancellation(models.Model):
         }
     }
 
+
   @api.model
   def create_notification_items(self, skipped_list, ngroup_id):
     """
@@ -688,22 +780,59 @@ class Cancellation(models.Model):
           "link_objects": urls
       })
 
+
   def cancellation_to_r3(self):
     """
     Pasa la anulación de oficio a R3 - Dirección
     """
+    self.update_after_r2('AV')
 
+
+  def cancellation_to_r2d(self):
+    """
+    Pasa la anulación de oficio a R2 - Llamada realizada
+    """
+    self.update_after_r2('R2QC')
+
+  
+    
+  def update_after_r2(self, type: str):
+    """
+    Modifica la anulación con el comentario y situation en función del tipo de acción tomada
+    """
+
+    assert type == 'AV' or type == 'R2M' or type == 'JUS' or type == 'R2QC', f'Tipo de acción en anulación de oficio no soportada'
+    
     current_datetime = datetime.now()
     current_day = current_datetime.strftime('%d-%m-%Y %H:%M:%S')
 
     current_employee = self.env.user.maya_employee_id
 
-    info = f'({current_day}) Ha notificado la decisión de anular el módulo. [{current_employee.display_name or "--"} / Ext: {current_employee.phone_extension or "--"}]' 
+    if type =='AV':
+      msg_info = 'Ha notificado la decisión de anular el módulo'
+      sit = '6'
+    elif type =='R2M':
+      msg_info = 'No se ha podido contactar telefonicamente. Se envía mail de notificación R2'
+      sit = '5'
+    elif type =='JUS':
+      msg_info = 'Justificación aceptada'
+      sit = '7'
+    elif type == 'R2QC':
+      msg_info = 'Notifica que quiere continuar. Debe conectarse al aula o será dado de baja'
+      sit = '5'
+
+
+    info = f'({current_day}) [{type}] {msg_info}. @{current_employee.display_name or "--"} | #{current_employee.phone_extension or "--"}]' 
+
+    if type == 'JUS': # la justiifcación se guarda al grabar, por lo que no modifico el self y espero a hacerlo en el write
+      return info
+  
+    self.comments_r2 = ((self.comments_r2 or '') + '\n' + info).lstrip('\n')
+    self.situation = sit
 
     self.notification_date_r2 = current_datetime.date()
-    self.comments_r2 = ((self.comments_r2 or '') + '\n' + info).lstrip('\n')
-    self.situation = '6'
-    
+
+
   def action_download_cancellation_r3_file(self):
     print("bahjo cosas")
     return
