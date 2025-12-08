@@ -143,6 +143,7 @@
             <page string='Justificación' name="tab2" invisible="situation in ['6','8','9']">
               <group col="3">
                 <group>
+                  <field name="any_related_in_sit_r2" invisible="1"/>
                   <field name="justification_end_date" readonly="justification_date_to_june_trigger or situation == '7'"  force_save="1"/>
                 </group>
                 <group>  
@@ -154,7 +155,7 @@
                             string="Justificar otras anulaciones"
                             icon="fa-calendar-check-o"
                             class="btn-success text-nowrap"
-                            invisible="situation not in ['7']"/>
+                            invisible="situation not in ['7'] or not any_related_in_sit_r2"/>
                 </group>
               </group>
               <group>

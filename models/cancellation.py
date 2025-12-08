@@ -10,6 +10,8 @@ from collections import defaultdict
 import json
 import logging
 
+from ..support.helper import create_info_register_cancellation
+
 from ...maya_core.support.helper import get_mail_server
 from ...maya_core.support.maya_logger.exceptions import MayaException
 
@@ -128,6 +130,8 @@ class Cancellation(models.Model):
 
   date_end_current_course = fields.Date(compute='_compute_date_end_current_course')  
 
+  any_related_in_sit_r2 = fields.Boolean(compute="_compute_any_related_in_sit_r2")
+
   _sql_constraints = [(
     'unique_subject_student_rel_id',
     'unique(subject_student_rel_id)',
@@ -233,6 +237,14 @@ class Cancellation(models.Model):
       self.date_end_current_course = date(current_sy[0].date_init.year + 1,6,30) 
 
 
+  @api.depends('related_cancellations_ids.situation') 
+  def _compute_any_related_in_sit_r2(self):
+    for rec in self:
+      if not rec.related_cancellations_ids:
+        rec.any_related_in_sit_r2 = False  # Si no hay ninguna
+      else:
+        rec.any_related_in_sit_r2 = any(c.situation == '4' for c in rec.related_cancellations_ids)
+
   def update_justification_end_date(self):
     """
     Actualiza la fecha de fin de justificación en función del checkbox justification_date_to_june_trigger
@@ -289,7 +301,9 @@ class Cancellation(models.Model):
     Actualiza en la base de datos un registro
     """    
     if 'justification_end_date' in vals and vals['justification_end_date']:
-      vals['comments_r2'] = ((self.comments_r2 or '') + '\n' + self.update_after_r2('JUS')).lstrip('\n')
+      comments, _, _ = create_info_register_cancellation(self.env.user.maya_employee_id, 'JUS', self.comments_r2)
+      
+      vals['comments_r2'] = comments
       vals['situation'] = '7'  ## justicada 
 
     if not self.justification_end_date and 'justification_end_date' not in vals or \
@@ -444,7 +458,9 @@ class Cancellation(models.Model):
     """
     self.send_notification_mail_subject('r2')
 
-    self.update_after_r2('R2M')
+    comments, sit, date = create_info_register_cancellation(self.env.user.maya_employee_id, 'R2M', self.comments_r2)
+
+    self.update_after_r2(comments, sit, date)
 
 
   def send_notification_mail_subject(self, risk):
@@ -785,7 +801,9 @@ class Cancellation(models.Model):
     """
     Pasa la anulación de oficio a R3 - Dirección
     """
-    self.update_after_r2('AV')
+    comments, sit, date = create_info_register_cancellation(self.env.user.maya_employee_id, 'AV', self.comments_r2)
+
+    self.update_after_r2(comments, sit, date)
 
     if self.related_cancellations_ids:
       return {
@@ -805,7 +823,9 @@ class Cancellation(models.Model):
     """
     Pasa la anulación de oficio a R2 - Llamada realizada
     """
-    self.update_after_r2('R2QC')
+    comments, sit, date = create_info_register_cancellation(self.env.user.maya_employee_id, 'R2QC', self.comments_r2)
+
+    self.update_after_r2(comments, sit, date)
 
     if self.related_cancellations_ids:
       return {
@@ -839,12 +859,11 @@ class Cancellation(models.Model):
       }
 
     
-  def update_after_r2(self, type: str):
+  def update_after_r2(self, comments: str, sit: str, date_event: date):
     """
     Modifica la anulación con el comentario y situation en función del tipo de acción tomada
     """
-
-    assert type == 'AV' or type == 'R2M' or type == 'JUS' or type == 'R2QC', f'Tipo de acción en anulación de oficio no soportada'
+    """  assert type == 'AV' or type == 'R2M' or type == 'JUS' or type == 'R2QC', f'Tipo de acción en anulación de oficio no soportada'
     
     current_datetime = datetime.now()
     current_day = current_datetime.strftime('%d-%m-%Y %H:%M:%S')
@@ -868,12 +887,12 @@ class Cancellation(models.Model):
     info = f'({current_day}) [{type}] {msg_info}. @{current_employee.display_name or "--"} | #{current_employee.phone_extension or "--"}]' 
 
     if type == 'JUS': # la justiifcación se guarda al grabar, por lo que no modifico el self y espero a hacerlo en el write
-      return info
+      return info """
   
-    self.comments_r2 = ((self.comments_r2 or '') + '\n' + info).lstrip('\n')
+    self.comments_r2 = comments
     self.situation = sit
 
-    self.notification_date_r2 = current_datetime.date()
+    self.notification_date_r2 = date_event
 
 
   def action_download_cancellation_r3_file(self):

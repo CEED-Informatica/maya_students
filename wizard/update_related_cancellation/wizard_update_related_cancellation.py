@@ -1,4 +1,5 @@
 from odoo import models, fields, api
+from ...support.helper import create_info_register_cancellation
 
 class WizardUpdateRelatedCancellation(models.TransientModel):
   """
@@ -59,20 +60,41 @@ class WizardUpdateRelatedCancellation(models.TransientModel):
     for line in self.line_ids:
       # Solo actualizamos si realmente ha cambiado algo
       if line.new_situation and line.new_situation != line.cancellation_id.situation:
+
+        comments, _, date = create_info_register_cancellation(self.env.user.maya_employee_id, 
+                                                                'AV' if line.new_situation == '6' else 'R2QC', 
+                                                                line.cancellation_id.comments_r2) 
         line.cancellation_id.write({
-          'situation': line.new_situation
+          'situation': line.new_situation,
+          'comments_r2': comments,
+          'notification_date_r2': date
         })
       elif line.new_situation_just and line.new_situation_just != line.cancellation_id.situation:
-        line.cancellation_id.write({
-         'situation': line.new_situation_just
-        })
+        if line.new_situation_just =='6':
+          type_cancellation = 'AV'
+        elif line.new_situation_just == '5':
+          type_cancellation = 'R2QC'
+        elif  line.new_situation_just == '7':
+          type_cancellation = 'JUS'
 
+        comments, _, date = create_info_register_cancellation(self.env.user.maya_employee_id, 
+                                                                type_cancellation, 
+                                                                line.cancellation_id.comments_r2) 
+      
         # si está justificando → copiar comentarios y fecha
         if line.new_situation_just == '7':
           line.cancellation_id.write({
+            'situation': '7',
+            'comments_r2': comments,
             'comments': parent_comments,
             'justification_end_date': parent_justification_end_date
           })
-          
+        else:
+          line.cancellation_id.write({
+            'situation': line.new_situation_just,
+            'comments_r2': comments,
+            'notification_date_r2': date
+          })
+
 
     return {"type": "ir.actions.act_window_close"}
