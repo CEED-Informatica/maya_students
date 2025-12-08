@@ -787,6 +787,19 @@ class Cancellation(models.Model):
     """
     self.update_after_r2('AV')
 
+    if self.related_cancellations_ids:
+      return {
+        "name": "Actualizar otras anulaciones",
+        "type": "ir.actions.act_window",
+        "res_model": "maya_students.wizard_update_related_cancellation",
+        "view_mode": "form",
+        "target": "new",
+        "context": {
+          "active_id": self.id,
+          "allow_justification": False,
+        }
+      }
+    
 
   def cancellation_to_r2d(self):
     """
@@ -794,7 +807,37 @@ class Cancellation(models.Model):
     """
     self.update_after_r2('R2QC')
 
+    if self.related_cancellations_ids:
+      return {
+        "name": "Actualizar otras anulaciones",
+        "type": "ir.actions.act_window",
+        "res_model": "maya_students.wizard_update_related_cancellation",
+        "view_mode": "form",
+        "target": "new",
+        "context": {
+          "active_id": self.id,
+          "allow_justification": False,
+        }
+      }
   
+
+  def justify_other_cancellations(self):
+    """
+    Se muestra la ventana de justificaciones para otras anulaciones
+    """
+    if self.related_cancellations_ids:
+      return {
+        "name": "Actualizar otras anulaciones",
+        "type": "ir.actions.act_window",
+        "res_model": "maya_students.wizard_update_related_cancellation",
+        "view_mode": "form",
+        "target": "new",
+        "context": {
+          "active_id": self.id,
+          "allow_justification": True,
+        }
+      }
+
     
   def update_after_r2(self, type: str):
     """

@@ -1,0 +1,40 @@
+<odoo>
+  <data>
+    <record id="view_wizard_update_related_cancellations_line_tree"
+          model="ir.ui.view">
+      <field name="name">wizard.update.related.cancellation.line.tree</field>
+      <field name="model">maya_students.wizard_update_related_cancellation_line</field>
+      <field name="arch" type="xml">
+          <tree create="false" delete="false" editable="bottom">
+              <field name="wizard_id" column_invisible = "1"/>
+              <field name="cancellation_id" column_invisible = "1"/>  
+              <field name="subject_name" readonly="1"/>
+              <field name="current_situation" readonly="1"/>
+              <field name="new_situation"  column_invisible="parent.allow_justification == True"/>
+              <field name="new_situation_just" column_invisible="parent.allow_justification == False"/>
+          </tree>
+      </field>
+    </record>
+
+
+    <record id="view_wizard_update_related_cancellations" model="ir.ui.view">
+      <field name="name">wizard.update.related.cancellations.form</field>
+      <field name="model">maya_students.wizard_update_related_cancellation</field>
+      <field name="arch" type="xml">
+        <form>
+          <field name="allow_justification" invisible="1"/>
+          <field name="line_ids" widget="one2many_list"/>
+          <footer>
+            <button string="Cancelar"
+                    class="btn-secondary"
+                    special="cancel"/>
+            <button string="Aceptar"
+                    type="object"
+                    name="action_confirm"
+                    class="btn-primary"/>
+          </footer>
+        </form>
+      </field>
+    </record>
+  </data>
+</odoo>

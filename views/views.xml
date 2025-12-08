@@ -141,12 +141,20 @@
               </div>
             </page>
             <page string='Justificación' name="tab2" invisible="situation in ['6','8','9']">
-              <group col="2">
+              <group col="3">
                 <group>
                   <field name="justification_end_date" readonly="justification_date_to_june_trigger or situation == '7'"  force_save="1"/>
                 </group>
                 <group>  
                   <field name="justification_date_to_june_trigger" readonly="situation== '7'"/>
+                </group>
+                <group>
+                  <button name="justify_other_cancellations"
+                            type="object"
+                            string="Justificar otras anulaciones"
+                            icon="fa-calendar-check-o"
+                            class="btn-success text-nowrap"
+                            invisible="situation not in ['7']"/>
                 </group>
               </group>
               <group>
@@ -212,6 +220,13 @@
       <field name="view_mode">form</field>
       <field name="target">inline</field> <!-- new window: emergente, curret: en al misma, inline: sin botones editar/crear-->
       <field name="context">{'module': 'maya_students'}</field>
+    </record>
+
+    <record  model="ir.actions.act_window" id="maya_students.action_wizard_update_related_cancellations">
+      <field name="name">Actualizar anulaciones</field>
+      <field name="res_model">maya_students.wizard_update_related_cancellation</field>
+      <field name="view_mode">form</field>
+      <field name="target">new</field>
     </record>
 
     <!-- action server para la sincronización de los estudiantes con itaca-->

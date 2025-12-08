@@ -37,6 +37,9 @@
         'security/ir.model.access.csv',
         # vistas
         'views/views.xml',
+        # wizards
+        'wizard/update_related_cancellation/wizard_update_related_cancellation.xml',
+        # mail templates
         'views/mail_templates/mail_risk1.xml',
         'views/mail_templates/mail_risk2.xml',
         'views/mail_templates/notification_cancellation_teacher_task.xml',
