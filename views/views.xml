@@ -7,6 +7,7 @@
       <field name="model">maya_students.cancellation</field>
       <field name="arch" type="xml">
         <search>
+          <filter name="filter_situation_r3" string="En riesgo 3" domain="[ ('situation', '=', '6')]"/>
           <group expand='0' string='Agrupar'>
             <filter name="group_by_course" string="Por ciclo" context="{'group_by': 'subject_course'}"/>
             <filter name="group_by_subject" string="Por módulo" context="{'group_by': 'subject_name'}"/>
@@ -24,6 +25,13 @@
           <field name="subject_name" />
           <field name="subject_course" />
           <field name="situation" />
+          <header>
+              <button name="action_add_to_signature_batch"
+                      type="object"
+                      string="Firmar PDFs seleccionados"
+                      class="btn-primary"
+                      confirm="Se van a firmar todos los certificados seleccionados. ¿Continuar?"/>
+            </header>
         </tree>
       </field>
     </record>
@@ -181,6 +189,21 @@
                   <field name="work_email"/>
                 </tree>
               </field>
+            </page>
+            <page string='Documentación'>
+              <group>
+                <separator string="Informe de baja" style="padding-bottom:15px"/>
+                <group>
+                  <field name="signed_pdf_filename" invisible="1"/>
+                  <field name="signed_pdf" 
+                         string="PDF Firmado"
+                         filename="signed_pdf_filename"
+                         widget="binary"/>
+                  <field name="signature_date"/>
+                  <field name="signature_user_id"/> 
+                </group>
+              </group>
+
             </page>
           </notebook>
         </form>

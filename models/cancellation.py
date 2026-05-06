@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo import api, models, fields
+from odoo import api, models, fields, _
 from odoo.exceptions import UserError, ValidationError
 import smtplib  
 import socket   
@@ -9,11 +9,11 @@ from datetime import date, datetime
 from collections import defaultdict
 import json
 import logging
+import re
 
 from ..support.helper import create_info_register_cancellation
 
 from ...maya_core.support.helper import get_mail_server
-from ...maya_core.support.maya_logger.exceptions import MayaException
 
 _logger = logging.getLogger(__name__)
 
@@ -29,6 +29,7 @@ class Cancellation(models.Model):
   """
   _name = 'maya_students.cancellation'
   _description = 'Anulaciones de matrícula'
+  _inherit = ['maya_core.signature.mixin']
 
   # tipo de anulación, ordinaria o de oficio
   cancellation_type = fields.Selection([('ORD', 'Ordinaria'), ('OFC', 'Oficio')], required = True, default = 'ORD', string = 'Tipo')
@@ -74,6 +75,8 @@ class Cancellation(models.Model):
 
   comments_r2 = fields.Text(string = 'Registro',
                         help = 'Información relativa a la notificación de R2')
+  
+  comments_r2_2_report = fields.Text(compute='_compute_comments_r2_2_report')
 
   # Relación 1:1 con subject_student_rel
   subject_student_rel_id = fields.Many2one(
@@ -211,6 +214,14 @@ class Cancellation(models.Model):
       else:
         record.classroom_link = ''
 
+  @api.depends('comments_r2')
+  def _compute_comments_r2_2_report(self):
+    """
+    Calcula las observaciones para el informe en función del registro comments_r2
+    """
+    self.ensure_one()
+    self.comments_r2_2_report = re.sub(r'(\[.*?\])|(@.*$)', '', self.comments_r2, flags=re.MULTILINE)
+
 
   def clear_justification_date(self):
     """
@@ -228,11 +239,12 @@ class Cancellation(models.Model):
     current_sy = (self.env['maya_core.school_year'].search([('state', '=', 1)])) # curso escolar actual  
 
     if len(current_sy) == 0:
-      raise MayaException(
+      """ raise MayaException(
           _logger, 
           'No se ha definido un curso actual',
           50, # critical
-          comments = '''Es posible que no se haya marcado como actual ningún curso escolar''')
+          comments = '''Es posible que no se haya marcado como actual ningún curso escolar''') """
+      raise ValidationError(_("No se ha definido un curso actual."))
     else:
       self.date_end_current_course = date(current_sy[0].date_init.year + 1,6,30) 
 
@@ -772,7 +784,7 @@ class Cancellation(models.Model):
 
     # Creo las notificaciones
     for key, cancels in grouped.items():
-      course = self.env['maya_core.course'].browse(key[1]) if key[1] else None
+      course = self.env['maya_core.study'].browse(key[1]) if key[1] else None
       subject = self.env['maya_core.subject'].browse(key[2]) if key[2] else None
       user_email = self.env['res.users'].browse(key[0]).email
 
@@ -796,7 +808,6 @@ class Cancellation(models.Model):
           "link_objects": urls
       })
 
-
   def cancellation_to_r3(self):
     """
     Pasa la anulación de oficio a R3 - Dirección
@@ -817,8 +828,7 @@ class Cancellation(models.Model):
           "allow_justification": False,
         }
       }
-    
-
+  
   def cancellation_to_r2d(self):
     """
     Pasa la anulación de oficio a R2 - Llamada realizada
@@ -839,7 +849,6 @@ class Cancellation(models.Model):
           "allow_justification": False,
         }
       }
-  
 
   def justify_other_cancellations(self):
     """
@@ -858,43 +867,59 @@ class Cancellation(models.Model):
         }
       }
 
-    
   def update_after_r2(self, comments: str, sit: str, date_event: date):
     """
     Modifica la anulación con el comentario y situation en función del tipo de acción tomada
     """
-    """  assert type == 'AV' or type == 'R2M' or type == 'JUS' or type == 'R2QC', f'Tipo de acción en anulación de oficio no soportada'
-    
-    current_datetime = datetime.now()
-    current_day = current_datetime.strftime('%d-%m-%Y %H:%M:%S')
-
-    current_employee = self.env.user.maya_employee_id
-
-    if type =='AV':
-      msg_info = 'Ha notificado la decisión de anular el módulo'
-      sit = '6'
-    elif type =='R2M':
-      msg_info = 'No se ha podido contactar telefonicamente. Se envía mail de notificación R2'
-      sit = '5'
-    elif type =='JUS':
-      msg_info = 'Justificación aceptada'
-      sit = '7'
-    elif type == 'R2QC':
-      msg_info = 'Notifica que quiere continuar. Debe conectarse al aula o será dado de baja'
-      sit = '5'
-
-
-    info = f'({current_day}) [{type}] {msg_info}. @{current_employee.display_name or "--"} | #{current_employee.phone_extension or "--"}]' 
-
-    if type == 'JUS': # la justiifcación se guarda al grabar, por lo que no modifico el self y espero a hacerlo en el write
-      return info """
   
     self.comments_r2 = comments
     self.situation = sit
 
     self.notification_date_r2 = date_event
 
+  def _get_pdf_for_signature(self):
+    """
+    Genera el PDF de la baja
+    """
+    self.ensure_one()
 
-  def action_download_cancellation_r3_file(self):
-    print("bahjo cosas")
-    return
+    if self.situation != '6': # solo anulaciones en R3
+      return None
+    
+    pdf_content, _ = self.env['ir.actions.report']._render_qweb_pdf(
+        'maya_students.report_subject_cancellation_exofficio',
+        self.ids)
+
+    return pdf_content
+    
+  def _get_signature_filename(self):
+    """
+    Devuelve el nombre del archivo del pdf de la baja
+    """
+    self.ensure_one()
+    
+    return f"Baja_Oficio_{self.student_nia}_{self.subject_course}_{self.subject_student_rel_id.subject_id.code}.pdf"
+
+  def action_add_to_signature_batch(self):
+    batch = self._create_batch()
+
+    protocol_url, batch_id = batch.action_sign_automatically()
+
+    # Llamo a la acción que ejecutará JavaScript para invocar el protocolo
+    result = {
+      'type': 'ir.actions.client',
+      'tag': 'maya_signer_protocol_launcher',
+      'params': {
+        'protocol_url': protocol_url,
+        'batch_id': batch_id,
+      }
+    }
+  
+    return result
+  
+  def _on_document_signed(self):
+    """
+    Hook llamado desde el mixin cuando el documento se firma
+    """
+    if self.cancellation_type == 'OFC' and self.situation == '6':
+        self.situation = '8'
